@@ -192,4 +192,4 @@ function SBOMResearcher {
     }
 }
 
-SBOMResearcher -SBOMPath "" -wrkDir ""
+#SBOMResearcher -SBOMPath "" -wrkDir ""
