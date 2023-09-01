@@ -82,14 +82,14 @@ function Get-VulnList {
 
                     #build uri string to display calculated score and impacted areas
                     if ($vulnerability | Get-Member "Severity") {
-                        if ($vulnerability.severity.score.contains("3.0")) {
+                        if ($vulnerability.severity.score.vector.contains("3.0")) {
                             #CVSS 3.0
                             $scoreuri = "https://www.first.org/cvss/calculator/3.0#"
-                            $scoreuri = $scoreuri + $vulnerability.severity.score
-                        } elseif ($vulnerability.severity.score.contains("3.1")) {
+                            $scoreuri = $scoreuri + $vulnerability.severity.score.vector
+                        } elseif ($vulnerability.severity.score.vector.contains("3.1")) {
                             #CVSS 3.1
                             $scoreuri = "https://www.first.org/cvss/calculator/3.1#"
-                            $scoreuri = $scoreuri + $vulnerability.severity.score
+                            $scoreuri = $scoreuri + $vulnerability.severity.score.vector
                         } else {
                             #if this string shows up in any output file, need to build a new section for the new score version
                             $scoreuri = "UPDATE CODE FOR THIS CVSS SCORE TYPE -> $vulnerability.severity.score"

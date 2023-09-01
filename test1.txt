@@ -1,0 +1,9 @@
+------------------------------------------------------------
+-   Component: example (1.0.0)
+------------------------------------------------------------
+Vulnerability: OSV-2021-123
+Summary: Example vulnerability summary
+Details:  Example vulnerability details
+Fixed Version:  1.0.1
+Score page:  https://www.first.org/cvss/calculator/3.0#CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+
