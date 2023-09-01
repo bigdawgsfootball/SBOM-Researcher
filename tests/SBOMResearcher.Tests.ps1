@@ -278,6 +278,6 @@ Describe 'Get-VulnList' {
         Get-Content $outfile | Should -BeExactly $ExpectedOutput
 
         # Remove the output file
-        Remove-Item $outfile
+        #Remove-Item $outfile
     }
 }
