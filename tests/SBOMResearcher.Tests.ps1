@@ -264,9 +264,9 @@ Describe 'Get-VulnList' {
         param($SBOM, $outfile, $ListAll, $ExpectedOutput)
         
         # Remove the output file if it exists
-        #if (Test-Path $outfile) {
-        #    Remove-Item $outfile
-        #}
+        if (Test-Path $outfile) {
+            Remove-Item $outfile
+        }
 
         # Invoke the function with the test parameters
         Get-VulnList -SBOM $SBOM -outfile $outfile -ListAll $ListAll
@@ -276,6 +276,6 @@ Describe 'Get-VulnList' {
         Get-Content $outfile | Should -BeExactly $ExpectedOutput
 
         # Remove the output file
-        #Remove-Item $outfile
+        Remove-Item $outfile
     }
 }
