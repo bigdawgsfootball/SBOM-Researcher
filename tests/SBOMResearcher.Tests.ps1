@@ -1,5 +1,7 @@
+BeforeAll {
 # Import the function to test
 . .\SBOMResearcher.ps1
+}
 
 # Define the test cases for Get-HighVersion
 $testCases = @(
