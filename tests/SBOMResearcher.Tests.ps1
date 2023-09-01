@@ -68,7 +68,7 @@ $testCases = @(
             "-   OS Name:  Windows 10"
             "-   OS Version: 10.0.19042"
             "-   OS Descriptiom:  Microsoft Windows 10 Home Edition"
-            "------------------------------------------------------------"            
+            "------------------------------------------------------------"
         )
     }
     # Test case 3: SBOM with multiple components
@@ -262,7 +262,7 @@ Describe 'Get-VulnList' {
 
     It 'writes <ExpectedOutput> to <outfile> when SBOM is <SBOM> and ListAll is <ListAll>' -TestCases $testCases {
         param($SBOM, $outfile, $ListAll, $ExpectedOutput)
-        
+
         # Remove the output file if it exists
         if (Test-Path $outfile) {
             Remove-Item $outfile
