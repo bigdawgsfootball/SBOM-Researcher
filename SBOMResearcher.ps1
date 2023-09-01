@@ -1,5 +1,6 @@
 function Get-HighVersion {
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory=$true)][string]$High,
         [Parameter(Mandatory=$true)][string]$Compare
@@ -28,7 +29,8 @@ function Get-VulnList {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
-        [Parameter(Mandatory=$true)][string]$outfile
+        [Parameter(Mandatory=$true)][string]$outfile,
+        [Parameter(Mandatory=$true)][boolean]$ListAll
     )
 
     $fixedHigh = "UNSET"
@@ -42,8 +44,8 @@ function Get-VulnList {
         if ($fixedHigh -ne "UNSET") {
             Write-Output "##############" | Out-File -FilePath $outfile -Append
             Write-Output "-   Recommended Version to upgrade to that addresses all vulnerabilities: $fixedHigh" | Out-File -FilePath $outfile -Append
-            Write-Output "##############" | Out-File -FilePath $outfile -Append 
-            $fixedHigh = "UNSET"                     
+            Write-Output "##############" | Out-File -FilePath $outfile -Append
+            $fixedHigh = "UNSET"
         }
 
         if ($type -eq "library" -or $type -eq "framework") {
@@ -178,7 +180,7 @@ function SBOMResearcher {
             Write-Output $file.FullName | Out-File -FilePath $outfile
             Write-Output "=====================================================================================" | Out-File -FilePath $outfile -Append
             $SBOM = Get-Content -Path $file.fullname | ConvertFrom-Json
-            Get-VulnList -SBOM $SBOM -outfile $outfile
+            Get-VulnList -SBOM $SBOM -outfile $outfile -ListAll $ListAll
         }
     } else {
         #file
@@ -186,7 +188,7 @@ function SBOMResearcher {
         Write-Output $file.FullName | Out-File -FilePath $outfile
         Write-Output "=====================================================================================" | Out-File -FilePath $outfile -Append
         $SBOM = Get-Content -Path $SBOMPath | ConvertFrom-Json
-        Get-VulnList -SBOM $SBOM -outfile $outfile
+        Get-VulnList -SBOM $SBOM -outfile $outfile -ListAll $ListAll
     }
 }
 
