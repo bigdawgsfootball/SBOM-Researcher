@@ -1,13 +1,22 @@
-name: Test PowerShell on Ubuntu
+name: Pester
 on: push
 jobs:
   pester-test:
     name: Pester test
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
       - name: Perform a Pester test from the Tests.ps1 file
         shell: pwsh
         run: |
-          Invoke-Pester -Script "." -OutputFile "./Test-Pester.XML" -OutputFormat 'NUnitXML'
+          Set-PSRepository psgallery -InstallationPolicy trusted
+          Install-Module -Name Pester -RequiredVersion 5.0.4 -Confirm:$false -Force
+          Invoke-Pester -Script SBOMResearcher.Tests.ps1 -OutputFile "./Test-Pester.XML" -OutputFormat 'NUnitXML' -Passthru
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: Pester-Unit-Tests
+          path: Test-Pester.XML
+    if: ${{ always() }}
+
