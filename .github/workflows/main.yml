@@ -11,9 +11,9 @@ jobs:
         shell: pwsh
         run: |
           Set-PSRepository psgallery -InstallationPolicy trusted
-          Install-Module -Name Pester -RequiredVersion 5.0.4 -Confirm:$false -Force
+          Install-Module -Name Pester -Confirm:$false -Force
           . .\SBOMResearcher.ps1
-          Invoke-Pester -Script .\tests\SBOMResearcher.Tests.ps1 -OutputFile "./Test-Pester.XML" -OutputFormat 'JUnitXML' -Passthru
+          Invoke-Pester -Script .\tests\SBOMResearcher.Tests.ps1 -OutputFile "./Test-Pester.XML" -OutputFormat 'NUnitXML' -Passthru
       - name: Upload test results
         uses: actions/upload-artifact@v3
         with:
