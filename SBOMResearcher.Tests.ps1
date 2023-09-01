@@ -5,7 +5,7 @@
 $testCases = @(
     @{High = "UNSET"; Compare = "UNSET"; Expected = "Unresolved version"}
     @{High = "UNSET"; Compare = "1.0.0"; Expected = "1.0.0"}
-    @{High = "1.0.0"; Compare = "UNSET"; Expected = "1.0.0"}
+    @{High = "1.0.0"; Compare = "UNSET"; Expected = "Unresolved version"}
     @{High = "1.0.0"; Compare = "2.0.0"; Expected = "2.0.0"}
     @{High = "2.0.0"; Compare = "1.0.0"; Expected = "2.0.0"}
     @{High = "Unresolved version"; Compare = "UNSET"; Expected = "Unresolved version"}
