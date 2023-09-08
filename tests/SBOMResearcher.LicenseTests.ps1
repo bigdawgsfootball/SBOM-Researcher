@@ -108,8 +108,8 @@ Describe "PrintLicenses" {
     }
 
     It "should throw an error if no licenses are provided" {
-        
+
        { PrintLicenses } | Should -Throw "Cannot validate argument on parameter 'alllicenses'. The argument is null or empty."
-        
+
     }
 }
