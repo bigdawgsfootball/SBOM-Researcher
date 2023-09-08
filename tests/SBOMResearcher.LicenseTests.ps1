@@ -35,14 +35,14 @@ $outfile = ".\test.txt"
 Describe "PrintLicenses" {
     BeforeEach {
         # Remove the output file if it exists
-        if (Test-Path $outfile) {
+        if ($outfile -and (Test-Path $outfile)) {
             Remove-Item $outfile
         }
     }
 
     AfterEach {
         # Remove the output file if it exists
-        if (Test-Path $outfile) {
+        if ($outfile -and (Test-Path $outfile)) {
             Remove-Item $outfile
         }
     }
