@@ -69,7 +69,7 @@ function PrintLicenses {
     $MedRiskLicenses = @("EPL-2.0", "MPL-1.0", "MPL-1.1", "MPL-2.0", "EPL-1.0", "CDDL-1.1", "AFL-2.1", "CPL-1.0", "CC-BY-4.0", "Artistic-2.0", "CC-BY-3.0", "AFL-3.0", "BSL-1.0", "OLDAP-2.8", "Python-2.0", "Ruby")
     #High Risk licenses often require actions that we may not be able to take, like applying a copyright on the deritive work (which gov't produced code can't do) or applying the same license to the deritive work (which gov't produced code is licensed differently)
     $HighRiskLicenses = @("LGPL-2.0-or-later", "LGPL-2.1-or-later", "GPL-2.0-or-later", "GPL-2.0-only", "GPL-3.0-or-later", "GPL-2.0+", "GPL-3.0+", "LGPL-2.0", "LGPL-2.0+", "LGPL-2.1", "LGPL-2.1+", "LGPL-3.0", "LGPL-3.0+", "GPL-2.0", "CC-BY-3.0-US", "CC-BY-SA-3.0", "GFDL-1.2", "GFDL-1.3", "GPL-3.0", "GPL-1.0", "GPL-1.0+", "IJG", "AGPL-3.0", "CC-BY-SA-4.0")
-    
+
     #determine all the license risk categories
     foreach ($lic in $alllicenses) {
         if ($LowRiskLicenses.Contains($lic.license.id)) {
@@ -241,7 +241,7 @@ function Get-VulnList {
             Write-Output "Not capturing $type"
         }
     }
-    
+
     #In case the last package has multiple fixed versions, print the high water mark for fixed versions after all have been evaluated
     if ($fixedHigh -ne "UNSET") {
         Write-Output "##############" | Out-File -FilePath $outfile -Append
@@ -249,7 +249,7 @@ function Get-VulnList {
         Write-Output "##############" | Out-File -FilePath $outfile -Append
         $fixedHigh = "UNSET"
     }
-    
+
     if ($PrintLicenseInfo) {
         PrintLicenses($alllicenses)
     }
