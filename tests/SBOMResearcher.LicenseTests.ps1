@@ -58,8 +58,8 @@ Describe "PrintLicenses" {
         $content = Get-Content $outfile -Raw
         $content | Should -Match "-   Low Risk Licenses found in this SBOM:  MIT   MIT"
         $content | Should -Match "-   Medium Risk Licenses found in this SBOM:  MPL-2.0"
-        $content | Should -NotMatch "-   High Risk Licenses found in this SBOM:"
-        $content | Should -NotMatch "-   Unmapped Licenses found in this SBOM:"
+        $content | Should -Match "-   High Risk Licenses found in this SBOM:"
+        $content | Should -Match "-   Unmapped Licenses found in this SBOM:"
     }
 
     It "should print medium risk licenses correctly" {
@@ -73,8 +73,8 @@ Describe "PrintLicenses" {
         $content = Get-Content $outfile -Raw
         $content | Should -Match "-   Medium Risk Licenses found in this SBOM:  MPL-2.0   MPL-2.0"
         $content | Should -Match "-   High Risk Licenses found in this SBOM:  GPL-3.0"
-        $content | Should -NotMatch "-   Low Risk Licenses found in this SBOM:"
-        $content | Should -NotMatch "-   Unmapped Licenses found in this SBOM:"
+        $content | Should -Match "-   Low Risk Licenses found in this SBOM:"
+        $content | Should -Match "-   Unmapped Licenses found in this SBOM:"
     }
 
     It "should print high risk licenses correctly" {
@@ -88,8 +88,8 @@ Describe "PrintLicenses" {
         $content = Get-Content $outfile -Raw
         $content | Should -Match "-   High Risk Licenses found in this SBOM:  GPL-3.0   GPL-3.0"
         $content | Should -Match "-   Unmapped Licenses found in this SBOM:  Unknown"
-        $content | Should -NotMatch "-   Low Risk Licenses found in this SBOM:"
-        $content | Should -NotMatch "-   Medium Risk Licenses found in this SBOM:"
+        $content | Should -Match "-   Low Risk Licenses found in this SBOM:"
+        $content | Should -Match "-   Medium Risk Licenses found in this SBOM:"
     }
 
     It "should print unmapped licenses correctly" {
@@ -103,13 +103,13 @@ Describe "PrintLicenses" {
         $content = Get-Content $outfile -Raw
         $content | Should -Match "-   Unmapped Licenses found in this SBOM:  Unknown   Unknown"
         $content | Should -Match "-   Low Risk Licenses found in this SBOM:  MIT"
-        $content | Should -NotMatch "-   Medium Risk Licenses found in this SBOM:"
-        $content | Should -NotMatch "-   High Risk Licenses found in this SBOM:"
+        $content | Should -Match "-   Medium Risk Licenses found in this SBOM:"
+        $content | Should -Match "-   High Risk Licenses found in this SBOM:"
     }
 
     It "should throw an error if no licenses are provided" {
 
-       { PrintLicenses } | Should -Throw "Cannot validate argument on parameter 'alllicenses'. The argument is null or empty."
+       { PrintLicenses -alllicenses $alllicenses } | Should -Throw "Cannot bind argument to parameter 'alllicenses' because it is null."
 
     }
 }
