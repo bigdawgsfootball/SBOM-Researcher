@@ -295,4 +295,4 @@ function SBOMResearcher {
     }
 }
 
-SBOMResearcher -SBOMPath Z:\Temp\SBOMResearcher\SilentAurora\sboms -wrkDir C:\Temp\SBOMResearcher\SilentAurora -PrintLicenseInfo $true
+SBOMResearcher -SBOMPath "" -wrkDir "" -PrintLicenseInfo $true
