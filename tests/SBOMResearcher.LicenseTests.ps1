@@ -1,6 +1,6 @@
 BeforeAll {
 # Import the function from the script file
-. .\PrintLicenses.ps1
+. .\SBOMResearcher.ps1
 }
 
 # Define some mock licenses for testing
