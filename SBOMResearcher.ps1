@@ -295,4 +295,4 @@ function SBOMResearcher {
     }
 }
 
-SBOMResearcher -SBOMPath "" -wrkDir "" -PrintLicenseInfo $true
+#SBOMResearcher -SBOMPath "" -wrkDir "" -PrintLicenseInfo $true
