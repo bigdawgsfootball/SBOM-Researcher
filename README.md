@@ -11,11 +11,17 @@ CVSS score for each vulnerability if the CVSS score was provided.
 Each vulnerability in the report will list the Vulnerability ID, Summary,
 Details, Fixed Version and a calculated CVSS Score link, if supplied.
 
+A rollup summary for each component in the report will indicate if there is a Version
+you could upgrade to that will address all vulnerabilities.
+
+A rollup summary at the end of the report can indicate (if commandline option provided)
+an assessed risk level of all open source licenses that were found.
+
 Has only been tested so far against CycloneDX formated SBOMs.
 
 ## Usage
 SBOMResearcher -SBOMPath "_{Path to SBOM File or Directory}_" -wrkDir
-"_{Path to Directory for output files}_" [Optional]-ListAll $true\
+"_{Path to Directory for output files}_" [Optional]-ListAll $true [Optional]-PrintLicenseInfo $true\
 \
 It's best if the -wrkDir path is different from the -SBOMPath \
 Currently fileshare.resource.jwac.mil\temp\SBOMResearch\ _{ProjectName}_ is
@@ -25,7 +31,7 @@ The Optional -ListAll parameter will print every purl evaluated into the
 output file, even if no vulnerabilities are found in it. If not included,
 the default is to only print vulnerabilities found
 
-## Best Practice enforcement
+## Best Practices enforcement
 SBOM-Researcher is evaluated against the default set of PSScriptAnalyzer
 rules. All rules are enforced. \
 Help documentation limited to the Usage section and comments in code.\
