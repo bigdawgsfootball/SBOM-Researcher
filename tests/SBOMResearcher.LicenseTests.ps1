@@ -1,7 +1,6 @@
 BeforeAll {
 # Import the function from the script file
 . .\SBOMResearcher.ps1
-}
 
 # Define some mock licenses for testing
 $mockLowRiskLicense = [PSCustomObject]@{
@@ -30,6 +29,10 @@ $mockUnmappedLicense = [PSCustomObject]@{
 
 # Define the output file path
 $outfile = ".\test.txt"
+
+}
+
+
 
 # Start the pester tests
 Describe "PrintLicenses" {
