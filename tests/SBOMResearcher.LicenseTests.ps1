@@ -1,41 +1,38 @@
-BeforeAll {
-# Import the function from the script file
-. .\SBOMResearcher.ps1
-
-# Define some mock licenses for testing
-$mockLowRiskLicense = [PSCustomObject]@{
-    license = [PSCustomObject]@{
-        id = "MIT"
-    }
-}
-
-$mockMedRiskLicense = [PSCustomObject]@{
-    license = [PSCustomObject]@{
-        id = "MPL-2.0"
-    }
-}
-
-$mockHighRiskLicense = [PSCustomObject]@{
-    license = [PSCustomObject]@{
-        id = "GPL-3.0"
-    }
-}
-
-$mockUnmappedLicense = [PSCustomObject]@{
-    license = [PSCustomObject]@{
-        id = "Unknown"
-    }
-}
-
-# Define the output file path
-$outfile = ".\test.txt"
-
-}
-
-
-
 # Start the pester tests
 Describe "PrintLicenses" {
+    BeforeAll {
+        # Import the function from the script file
+        . .\SBOMResearcher.ps1
+        
+        # Define some mock licenses for testing
+        $mockLowRiskLicense = [PSCustomObject]@{
+            license = [PSCustomObject]@{
+                id = "MIT"
+            }
+        }
+        
+        $mockMedRiskLicense = [PSCustomObject]@{
+            license = [PSCustomObject]@{
+                id = "MPL-2.0"
+            }
+        }
+        
+        $mockHighRiskLicense = [PSCustomObject]@{
+            license = [PSCustomObject]@{
+                id = "GPL-3.0"
+            }
+        }
+        
+        $mockUnmappedLicense = [PSCustomObject]@{
+            license = [PSCustomObject]@{
+                id = "Unknown"
+            }
+        }
+        
+        # Define the output file path
+        $outfile = ".\test.txt"     
+        }
+        
     BeforeEach {
         # Remove the output file if it exists
         if ($outfile -and (Test-Path $outfile)) {
