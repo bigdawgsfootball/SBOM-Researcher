@@ -35,7 +35,7 @@ the default is to only print vulnerabilities found
 SBOM-Researcher is evaluated against the default set of PSScriptAnalyzer
 rules. All rules are enforced. \
 Help documentation limited to the Usage section and comments in code.\
-Pester tests implemented against Get-HighVersion function.
+Pester tests implemented against Get-HighVersion and PrintLicenses functions.
 
 ## Project status
 Under active development
