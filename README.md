@@ -17,7 +17,9 @@ you could upgrade to that will address all vulnerabilities.
 A rollup summary at the end of the report can indicate (if commandline option provided)
 an assessed risk level of all open source licenses that were found.
 
-Has only been tested so far against CycloneDX formated SBOMs.
+Has been tested reasonably so far against CycloneDX formated SBOMs.
+This is the initial attempt for including SPDX formated SBOMs.
+Your SBOMPath may include a mix of CycloneDX and SPDX SBOMs.
 
 ## Usage
 SBOMResearcher -SBOMPath "_{Path to SBOM File or Directory}_" -wrkDir
