@@ -201,8 +201,12 @@ function Get-VulnList {
                 #if fixed is set, this would be the version of the package that addresses the vulnerability
                 #there can be multiple fixed versions, some based on hashes in the repo, you don't want that one
                 foreach ($affected in $vulnerability.affected.ranges) {
-                    if (($affected.type -ne "GIT") -and ($null -ne $affected.events[1].fixed)) {
-                        $fixed = $affected.events[1].fixed
+                    try {
+                        if (($affected.type -ne "GIT") -and ($null -ne $affected.events[1].fixed)) {
+                            $fixed = $affected.events[1].fixed
+                        }
+                    } catch {
+                        $fixed = "UNSET"
                     }
                 }
 
