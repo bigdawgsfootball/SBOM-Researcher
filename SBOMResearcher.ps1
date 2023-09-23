@@ -127,8 +127,7 @@ function Get-VulnList {
     param(
         [Parameter(Mandatory=$true)][PSObject]$purls,
         [Parameter(Mandatory=$true)][string]$outfile,
-        [Parameter(Mandatory=$true)][boolean]$ListAll,
-        [Parameter(Mandatory=$false)][boolean]$PrintLicenseInfo=$false
+        [Parameter(Mandatory=$true)][boolean]$ListAll
     )
     #this function reads through an sbom and pulls out each component listed
     #it then queries the OSV DB using the purl of each component to find all vulnerabilities per component
@@ -202,7 +201,7 @@ function Get-VulnList {
                 #if fixed is set, this would be the version of the package that addresses the vulnerability
                 #there can be multiple fixed versions, some based on hashes in the repo, you don't want that one
                 foreach ($affected in $vulnerability.affected.ranges) {
-                    if ($affected.type -ne "GIT") {
+                    if (($affected.type -ne "GIT") -and ($null -ne $affected.events[1].fixed)) {
                         $fixed = $affected.events[1].fixed
                     }
                 }
@@ -260,7 +259,7 @@ function Get-SBOMType {
 
 }
 
-function Get-CycloneDXComponents {
+function Get-CycloneDXComponentList {
     [CmdletBinding()]
     [OutputType([string])]
     param(
@@ -271,7 +270,7 @@ function Get-CycloneDXComponents {
     foreach ($package in $SBOM.components) {
         $type = $package.type
         $pkgLicenses = $package.licenses
-        
+
         $found = $false
         #Pull out all the unique licenses found in the SBOM as you go. The full list will be printed together in the report.
         foreach ($license in $pkgLicenses) {
@@ -295,7 +294,7 @@ function Get-CycloneDXComponents {
             $name = $package.name
             $version = $package.version
             $desc = $package.description
-        
+
             # Print the OS name and version
             Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
             Write-Output "-   OS Name:  $name" | Out-File -FilePath $outfile -Append
@@ -305,7 +304,7 @@ function Get-CycloneDXComponents {
         } else {
             #If this pops on the output, need to add code to query OSV for this ecosystem
             Write-Output "Not capturing $type"
-        }   
+        }
     }
 
     if ($PrintLicenseInfo) {
@@ -315,7 +314,7 @@ function Get-CycloneDXComponents {
     Return $allpurls
 }
 
-function Get-SPDXComponents {
+function Get-SPDXComponentList {
     [CmdletBinding()]
     [OutputType([string])]
     param(
@@ -326,7 +325,7 @@ function Get-SPDXComponents {
     foreach ($package in $SBOM.packages) {
         $decLicense = $package.licenseDeclared
         $conLicense = $package.licenseConcluded
-        
+
         $found = $false
         #Pull out all the unique licenses found in the SBOM as you go. The full list will be printed together in the report.
         foreach ($complicense in $allLicenses) {
@@ -403,12 +402,12 @@ function SBOMResearcher {
             $SBOMType = Get-SBOMType -SBOM $SBOM
             $allpurls = @()
             switch ($SBOMType) {
-                "CycloneDX" { $allpurls = Get-CycloneDXComponents $SBOM $allLicenses }
-                "SPDX" { $allpurls = Get-SPDXComponents $SBOM $allLicenses }
+                "CycloneDX" { $allpurls = Get-CycloneDXComponentList $SBOM $allLicenses }
+                "SPDX" { $allpurls = Get-SPDXComponentList $SBOM $allLicenses }
                 "Unsupported" { Write-Output "This SBOM type is not supported" | Out-File -FilePath $outfile -Append }
             }
             if ($null -ne $allpurls) {
-                Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -PrintLicenseInfo $PrintLicenseInfo
+                Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll
             }
             }
     } else {
@@ -420,12 +419,12 @@ function SBOMResearcher {
         $SBOMType = Get-SBOMType -SBOM $SBOM
         $allpurls = @()
         switch ($SBOMType) {
-            "CycloneDX" { $allpurls = Get-CycloneDXComponents $SBOM $allLicenses }
-            "SPDX" { $allpurls = Get-SPDXComponents $SBOM $allLicenses }
+            "CycloneDX" { $allpurls = Get-CycloneDXComponentList $SBOM $allLicenses }
+            "SPDX" { $allpurls = Get-SPDXComponentList $SBOM $allLicenses }
             "Unsupported" { Write-Output "This SBOM type is not supported" | Out-File -FilePath $outfile -Append }
         }
         if ($null -ne $allpurls) {
-            Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -PrintLicenseInfo $PrintLicenseInfo
+            Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll
         }
     }
 }
