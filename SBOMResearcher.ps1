@@ -430,4 +430,4 @@ function SBOMResearcher {
     }
 }
 
-SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\sboms" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true
+#SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\sboms" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true
