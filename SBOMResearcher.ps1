@@ -244,7 +244,7 @@ function PrintVulnerabilities {
     Write-Output "=========================================================" | Out-File -FilePath $outfile -Append
     write-output "= List of all components with vulnerabilities and their SBOM file" | Out-File -FilePath $outfile -Append
     Write-Output "=========================================================" | Out-File -FilePath $outfile -Append
-    Write-Output $componentLocations | Format-Table | Out-File -FilePath $outfile -Append
+    Write-Output $componentLocations | Sort-Object -Property component, version | Format-Table | Out-File -FilePath $outfile -Append
     
 }
 
@@ -398,16 +398,22 @@ function Get-VulnList {
                 $loc = [PSCustomObject]@{
                   "component" = $component.name;
                   "version" = $component.version;
-                  "file" = $file.name
                 }
-                $componentLocations.Add($loc) | Out-Null
-            } elseif (Compare-Object -Ref $componentLocations -Dif $loc -Property component, version, file | Where-Object SideIndicator -eq '=>') { #but we need to know everywhere that component is found so each project can be fixed
+                foreach ($found in ($componentLocations | Where-Object { ($_.component -eq $loc.component) -and ($_.version -eq $loc.version)})) {
+                    if (Compare-Object -Ref $vulnLocations -Dif $found -Property component, version, file | Where-Object SideIndicator -eq '=>') {
+                        $vulnLocations.add($found) | Out-Null
+                    }
+                }
+             } elseif (Compare-Object -Ref $componentLocations -Dif $component -Property component, version, file | Where-Object SideIndicator -eq '=>') { #but we need to know everywhere that component is found so each project can be fixed
                 $loc = [PSCustomObject]@{
                     "component" = $component.name;
                     "version" = $component.version;
-                    "file" = $file.name
-                  }
-                  $componentLocations.Add($loc) | Out-Null  
+                }
+                foreach ($found in ($componentLocations | Where-Object { ($_.component -eq $loc.component) -and ($_.version -eq $loc.version)})) {
+                    if (Compare-Object -Ref $vulnLocations -Dif $found -Property component, version, file | Where-Object SideIndicator -eq '=>') {
+                        $vulnLocations.add($found) | Out-Null
+                    }
+                }
             }
 
         } else {
@@ -443,6 +449,8 @@ function Get-CycloneDXComponentList {
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
         [Parameter(Mandatory=$true)][PSObject]$allLicenses
     )
+    
+    $purlList = @()
 
     foreach ($package in $SBOM.components) {
         $type = $package.type
@@ -457,7 +465,9 @@ function Get-CycloneDXComponentList {
                 }
             }
             if (!($found)) {
-                $allLicenses += $license.license.id
+                if ($null -ne $license.license.id) {
+                    $allLicenses += $license.license.id
+                }
             } else {
                 $found = $false
             }
@@ -465,7 +475,16 @@ function Get-CycloneDXComponentList {
 
         if ($type -eq "library" -or $type -eq "framework") {
             # Get the component purl
-            $allpurls += $package.purl
+            if ($package.purl -notin $allpurls) {
+                $purlList += $package.purl
+                $loc = [PSCustomObject]@{
+                    "component" = Get-NameFromPurl -purl $package.purl;
+                    "version" = Get-VersionFromPurl -purl $package.purl;
+                    "file" = $file
+                  }
+                  $componentLocations.Add($loc) | Out-Null
+  
+            }
         } elseif ($type -eq "operating-system") {
             #OSV does not return good info on Operating Systems, just need to report OS and version for investigation
             $name = $package.name
@@ -485,10 +504,13 @@ function Get-CycloneDXComponentList {
     }
 
     if ($PrintLicenseInfo) {
+        Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
+        Write-Output "-   SBOM File:  $file" | Out-File -FilePath $outfile -Append
+
         PrintLicenses($allLicenses)
     }
 
-    Return $allpurls
+    Return $purlList
 }
 
 function Get-SPDXComponentList {
@@ -498,6 +520,8 @@ function Get-SPDXComponentList {
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
         [Parameter(Mandatory=$true)][PSObject]$allLicenses
     )
+
+    $purlList = @()
 
     foreach ($package in $SBOM.packages) {
         $decLicense = $package.licenseDeclared
@@ -533,17 +557,29 @@ function Get-SPDXComponentList {
         foreach ($refType in $package.externalRefs) {
             if ($refType.referenceType -eq "purl") {
                 # Get the component purl
-                $allpurls += $refType.referenceLocator
+                if ($refType.referenceLocator -notin $allpurls) {
+                    $purlList += $refType.referenceLocator
+                    $loc = [PSCustomObject]@{
+                        "component" = Get-NameFromPurl -purl $refType.referenceLocator;
+                        "version" = Get-VersionFromPurl -purl $refType.referenceLocator;
+                        "file" = $file
+                      }
+                      $componentLocations.Add($loc) | Out-Null
+      
+                }   
             }
         }
 
     }
 
     if ($PrintLicenseInfo) {
+        Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
+        Write-Output "-   SBOM File:  $file" | Out-File -FilePath $outfile -Append
+
         PrintLicenses($allLicenses)
     }
 
-    Return $allpurls
+    Return $purlList
 }
 
 function SBOMResearcher {
@@ -566,6 +602,8 @@ function SBOMResearcher {
     $allpurls = @()
     $allVulns=[System.Collections.ArrayList]@()
     $componentLocations=[System.Collections.ArrayList]@()
+    $vulnLocations=[System.Collections.ArrayList]@()
+
 
     $argType = Get-Item $SBOMPath
     if ($argType.PSIsContainer) {
@@ -581,43 +619,42 @@ function SBOMResearcher {
         foreach ($file in $argtype.GetFiles()) {
             $SBOM = Get-Content -Path $file.fullname | ConvertFrom-Json
             $SBOMType = Get-SBOMType -SBOM $SBOM
+            switch ($SBOMType) {
+                "CycloneDX" { $allpurls += Get-CycloneDXComponentList -SBOM $SBOM -allLicenses $allLicenses }
+                "SPDX" { $allpurls += Get-SPDXComponentList -SBOM $SBOM -allLicenses $allLicenses }
+                "Unsupported" { Write-Output "This SBOM type is not supported" | Out-File -FilePath $outfile -Append }
+            }
+        }
+            if ($null -ne $allpurls) {
+                Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll
+            }
+            
+            $allVulns | ConvertTo-Json -Depth 5 | Out-Null
+
+            PrintVulnerabilities -allcomponents $allVulns -componentLocations $vulnLocations
+        
+        } else {
+            #file
+            $outfile = $wrkDir + "\" + $argtype.name.replace(".json","") + "_report.txt"
+            Write-Output "Vulnerabilities found for Project: $($argtype.name)" | Out-File -FilePath $outfile
+            Write-Output "=====================================================================================" | Out-File -FilePath $outfile -Append
+            Write-Output "" | Out-File -FilePath $outfile -Append
+
+            $SBOM = Get-Content -Path $SBOMPath | ConvertFrom-Json
+            $SBOMType = Get-SBOMType -SBOM $SBOM
             $allpurls = @()
             switch ($SBOMType) {
-                "CycloneDX" { $allpurls = Get-CycloneDXComponentList $SBOM $allLicenses }
-                "SPDX" { $allpurls = Get-SPDXComponentList $SBOM $allLicenses }
+                "CycloneDX" { $allpurls = Get-CycloneDXComponentList -SBOM $SBOM -allLicenses $allLicenses }
+                "SPDX" { $allpurls = Get-SPDXComponentList -SBOM $SBOM -allLicenses $allLicenses }
                 "Unsupported" { Write-Output "This SBOM type is not supported" | Out-File -FilePath $outfile -Append }
             }
             if ($null -ne $allpurls) {
                 Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll
             }
-            }
             $allVulns | ConvertTo-Json -Depth 5 | Out-Null
 
-            PrintVulnerabilities -allcomponents $allVulns -componentLocations $componentLocations
-        
-        } else {
-        #file
-        $outfile = $wrkDir + "\" + $argtype.name.replace(".json","") + "_report.txt"
-        Write-Output "Vulnerabilities found for Project: $($argtype.name)" | Out-File -FilePath $outfile
-        Write-Output "=====================================================================================" | Out-File -FilePath $outfile -Append
-        Write-Output "" | Out-File -FilePath $outfile -Append
-
-        $SBOM = Get-Content -Path $SBOMPath | ConvertFrom-Json
-        $SBOMType = Get-SBOMType -SBOM $SBOM
-        $allpurls = @()
-        switch ($SBOMType) {
-            "CycloneDX" { $allpurls = Get-CycloneDXComponentList $SBOM $allLicenses }
-            "SPDX" { $allpurls = Get-SPDXComponentList $SBOM $allLicenses }
-            "Unsupported" { Write-Output "This SBOM type is not supported" | Out-File -FilePath $outfile -Append }
-        }
-        if ($null -ne $allpurls) {
-            Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll
-        }
-        $allVulns | ConvertTo-Json -Depth 5 | Out-Null
-
-        PrintVulnerabilities -allcomponents $allVulns -componentLocations $componentLocations
-    
+            PrintVulnerabilities -allcomponents $allVulns -componentLocations $vulnLocations   
     }
 }
 
-#SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\sboms" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true
+SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\sboms" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true
