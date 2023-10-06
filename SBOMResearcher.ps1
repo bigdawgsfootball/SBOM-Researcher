@@ -1,3 +1,98 @@
+function Convert-CVSSStringToBaseScore {
+    # This function takes a CVSS v3.1 string as input and returns the base score as output
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$CVSSString # The CVSS v3.1 string to convert
+    )
+
+    # Validate the input string
+    if ($CVSSString -notmatch "CVSS:3\.1/AV:[NALP]/AC:[LH]/PR:[NLH]/UI:[NR]/S:[UC]/C:[NLH]/I:[NLH]/A:[NLH]") {
+        Write-Error "Invalid CVSS v3.1 string format"
+        return
+    }
+
+    # Split the string into metrics and values
+    $values = $CVSSString.Split("/")[1..8] | ForEach-Object {$_.Split(":")[1]}
+
+    # Define the weight tables for each metric
+    $AVWeights = @{
+        N = 0.85
+        A = 0.62
+        L = 0.55
+        P = 0.2
+    }
+
+    $ACWeights = @{
+        L = 0.77
+        H = 0.44
+    }
+
+    $PRWeights = @{
+        N = @{
+            U = 0.85
+            C = 0.85
+        }
+        L = @{
+            U = 0.62
+            C = 0.68
+        }
+        H = @{
+            U = 0.27
+            C = 0.5
+        }
+    }
+
+    $UIWeights = @{
+        N = 0.85
+        R = 0.62
+    }
+
+    $CWeights = @{
+        N = 0
+        L = 0.22
+        H = 0.56
+    }
+
+    $IWeights = @{
+        N = 0
+        L = 0.22
+        H = 0.56
+    }
+
+    $AWeights = @{
+        N = 0
+        L = 0.22
+        H = 0.56
+    }
+
+    # Calculate the impact sub-score using the formula from the CVSS specification
+    $ISSBase = 1 - ((1 - $CWeights[$values[5]]) * (1 - $IWeights[$values[6]]) * (1 - $AWeights[$values[7]]))
+    
+    # Adjust the impact sub-score based on the scope metric value using the formula from the CVSS specification
+    if ($values[4] -eq "U") {
+        $ISSFinal = 6.42 * $ISSBase
+    } else {
+        $ISSFinal = 7.52 * ($ISSBase - 0.029) - 15 * [Math]::Pow(($ISSBase - 0.02),15)
+    }
+
+    # Calculate the exploitability sub-score using the formula from the CVSS specification
+    $ESSFinal = 8.22 * $AVWeights[$values[0]] * $ACWeights[$values[1]] * $prweights[$values[2]][$values[4]] * $UIWeights[$values[3]]
+
+    # Calculate the base score using the formula from the CVSS specification
+    if ($ISSFinal -le 0) {
+        $BaseScoreFinal = 0
+    }
+    elseif ($values[4] -eq "U") {
+        $BaseScoreFinal = [math]::Min([math]::Round(($ISSFinal + $ESSFinal),1),10)
+    }
+    else {
+        $BaseScoreFinal = [math]::Min([math]::Round((($ISSFinal + $ESSFinal) * 1.08),1),10)
+    }
+
+    # Return the base score as output
+    return $BaseScoreFinal
+}
+
 function ConvertTo-Version {
     param (
         [Parameter(Mandatory=$true)]
@@ -270,6 +365,7 @@ function Get-VulnList {
                         #CVSS 3.1
                         $scoreuri = "https://www.first.org/cvss/calculator/3.1#"
                         $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
+                        $vuln.Score = Convert-CVSSStringToBaseScore $vulnerability.severity.score
                     } else {
                         #if this string shows up in any output file, need to build a new section for the new score version
                         $vuln.ScoreURI = "UPDATE CODE FOR THIS CVSS SCORE TYPE -> $vulnerability.severity.score"
@@ -474,7 +570,7 @@ function SBOMResearcher {
     $argType = Get-Item $SBOMPath
     if ($argType.PSIsContainer) {
         #directory
-        $outfile = $wrkDir + "\" + $argType.Parent + "_report.txt"
+        $outfile = $wrkDir + "\" + $argType.Parent.Name + "_report.txt"
         Write-Output "SBOMResearcher Report for Project: $($argType.Parent)" | Out-File -FilePath $outfile
         Write-Output "=====================================================================================" | Out-File -FilePath $outfile -Append
         Write-Output "" | Out-File -FilePath $outfile -Append
