@@ -376,8 +376,8 @@ function Get-VulnList {
                 foreach ($affected in $vulnerability.affected.ranges) {
                     try {
                         if (($affected.type -ne "GIT") -and ($null -ne $affected.events[1].fixed)) {
-                        $fixed = $affected.events[1].fixed
-                    }
+                            $fixed = $affected.events[1].fixed
+                        }
                     } catch {
                         $fixed = "UNSET"
                     }
