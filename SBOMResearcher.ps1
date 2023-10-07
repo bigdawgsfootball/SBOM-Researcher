@@ -67,7 +67,7 @@ function Convert-CVSSStringToBaseScore {
 
     # Calculate the impact sub-score using the formula from the CVSS specification
     $ISSBase = 1 - ((1 - $CWeights[$values[5]]) * (1 - $IWeights[$values[6]]) * (1 - $AWeights[$values[7]]))
-    
+
     # Adjust the impact sub-score based on the scope metric value using the formula from the CVSS specification
     if ($values[4] -eq "U") {
         $ISSFinal = 6.42 * $ISSBase
@@ -199,7 +199,7 @@ function PrintVulnerabilities {
         Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
         Write-Output "-   Component: $($component.name) $($component.version)" | Out-File -FilePath $outfile -Append
         Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
-        
+
         foreach ($vuln in $component.Vulns) {
             # Print the vulnerability details
             # some vulnerabilities do not return a summary or fixed version
@@ -237,7 +237,7 @@ function PrintVulnerabilities {
             Write-Output "-   Recommended Version to upgrade to that addresses all $($component.name) $($component.version) vulnerabilities: $($component.Recommendation)" | Out-File -FilePath $outfile -Append
             Write-Output "##############" | Out-File -FilePath $outfile -Append
         }
-        
+    
     }
 
     # Now print out all components with vulnerabilities and where they were found
@@ -245,7 +245,7 @@ function PrintVulnerabilities {
     write-output "= List of all components with vulnerabilities and their SBOM file" | Out-File -FilePath $outfile -Append
     Write-Output "=========================================================" | Out-File -FilePath $outfile -Append
     Write-Output $componentLocations | Sort-Object -Property component, version | Format-Table | Out-File -FilePath $outfile -Append
-    
+
 }
 
 function Get-VersionFromPurl {
@@ -319,7 +319,7 @@ function Get-VulnList {
                 Recommendation = ""
                 Vulns = [System.Collections.ArrayList]@()
             }
-            
+
             $vulns = $response.Content | ConvertFrom-Json
 
             # Loop through each vulnerability in the response
@@ -344,7 +344,7 @@ function Get-VulnList {
                     ScoreURI = ""
                     Severity = ""
                 }
-                
+
                 #build uri string to display calculated score and impacted areas
                 if ($vulnerability | Get-Member "Severity") {
                     $vuln.Score = $vulnerability.severity[0].score
@@ -449,7 +449,7 @@ function Get-CycloneDXComponentList {
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
         [Parameter(Mandatory=$true)][PSObject]$allLicenses
     )
-    
+
     $purlList = @()
 
     foreach ($package in $SBOM.components) {
@@ -483,7 +483,7 @@ function Get-CycloneDXComponentList {
                     "file" = $file
                   }
                   $componentLocations.Add($loc) | Out-Null
-  
+
             }
         } elseif ($type -eq "operating-system") {
             #OSV does not return good info on Operating Systems, just need to report OS and version for investigation
@@ -565,8 +565,8 @@ function Get-SPDXComponentList {
                         "file" = $file
                       }
                       $componentLocations.Add($loc) | Out-Null
-      
-                }   
+
+                }
             }
         }
 
@@ -628,11 +628,11 @@ function SBOMResearcher {
             if ($null -ne $allpurls) {
                 Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll
             }
-            
+
             $allVulns | ConvertTo-Json -Depth 5 | Out-Null
 
             PrintVulnerabilities -allcomponents $allVulns -componentLocations $vulnLocations
-        
+
         } else {
             #file
             $outfile = $wrkDir + "\" + $argtype.name.replace(".json","") + "_report.txt"
@@ -653,7 +653,7 @@ function SBOMResearcher {
             }
             $allVulns | ConvertTo-Json -Depth 5 | Out-Null
 
-            PrintVulnerabilities -allcomponents $allVulns -componentLocations $vulnLocations   
+            PrintVulnerabilities -allcomponents $allVulns -componentLocations $vulnLocations
     }
 }
 
