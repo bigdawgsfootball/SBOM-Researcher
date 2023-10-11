@@ -195,49 +195,50 @@ function PrintVulnerabilities {
     )
 
     foreach($component in $allcomponents) {
-        # Print the component name and version
-        Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
-        Write-Output "-   Component: $($component.name) $($component.version)" | Out-File -FilePath $outfile -Append
-        Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
+        if (($null -ne $component.vulns) -and ($component.vulns.count -gt 0)) {
+            # Print the component name and version
+            Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
+            Write-Output "-   Component: $($component.name) $($component.version)" | Out-File -FilePath $outfile -Append
+            Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
 
-        foreach ($vuln in $component.Vulns) {
-            # Print the vulnerability details
-            # some vulnerabilities do not return a summary or fixed version
-            Write-Output "Vulnerability: $($vuln.ID)" | Out-File -FilePath $outfile -Append
-            Write-Output "Source: $($vuln.Source)" | Out-File -FilePath $outfile -Append
-            if ($null -ne $($vuln.Summary)) {
-                Write-Output "Summary: $($vuln.Summary)" | Out-File -FilePath $outfile -Append
-            }
-            Write-Output "Details:  $($vuln.Details)" | Out-File -FilePath $outfile -Append
-            Write-Output "Fixed Version:  $($vuln.Fixed)" | Out-File -FilePath $outfile -Append
-            if ($vuln.ScoreURI -ne "") {
-                Write-Output "Score page:  $($vuln.ScoreURI)" | Out-File -FilePath $outfile -Append
+            foreach ($vuln in $component.Vulns) {
+                # Print the vulnerability details
+                # some vulnerabilities do not return a summary or fixed version
+                Write-Output "Vulnerability: $($vuln.ID)" | Out-File -FilePath $outfile -Append
+                Write-Output "Source: $($vuln.Source)" | Out-File -FilePath $outfile -Append
+                if ($null -ne $($vuln.Summary)) {
+                    Write-Output "Summary: $($vuln.Summary)" | Out-File -FilePath $outfile -Append
+                }
+                Write-Output "Details:  $($vuln.Details)" | Out-File -FilePath $outfile -Append
+                Write-Output "Fixed Version:  $($vuln.Fixed)" | Out-File -FilePath $outfile -Append
+                if ($vuln.ScoreURI -ne "") {
+                    Write-Output "Score page:  $($vuln.ScoreURI)" | Out-File -FilePath $outfile -Append
+                }
+
+                if ($vuln.Score -ne "") {
+                    write-output "CVSS Breakdown:               $($vuln.Score)" | Out-File -FilePath $outfile -Append
+                    write-output "CVSS Attack Vector:           $($vuln.AV)" | Out-File -FilePath $outfile -Append
+                    write-output "CVSS Attack Complexity:       $($vuln.AC)" | Out-File -FilePath $outfile -Append
+                    write-output "CVSS Privileges Required:     $($vuln.PR)" | Out-File -FilePath $outfile -Append
+                    write-output "CVSS User Interaction:        $($vuln.UI)" | Out-File -FilePath $outfile -Append
+                    write-output "CVSS Scope:                   $($vuln.S)" | Out-File -FilePath $outfile -Append
+                    write-output "CVSS Confidentiality Impact:  $($vuln.C)" | Out-File -FilePath $outfile -Append
+                    write-output "CVSS Integrity Impact:        $($vuln.I)" | Out-File -FilePath $outfile -Append
+                    write-output "CVSS Availability Impact:     $($vuln.A)" | Out-File -FilePath $outfile -Append
+                    write-output "CVSS Severity:                $($vuln.Severity)" | Out-File -FilePath $outfile -Append
+                }
+
+                Write-Output "License info:  $($vuln.pkglicenses.license.id)" | Out-File -FilePath $outfile -Append
+                Write-Output "" | Out-File -FilePath $outfile -Append
             }
 
-            if ($vuln.Score -ne "") {
-                write-output "CVSS Breakdown:               $($vuln.Score)" | Out-File -FilePath $outfile -Append
-                write-output "CVSS Attack Vector:           $($vuln.AV)" | Out-File -FilePath $outfile -Append
-                write-output "CVSS Attack Complexity:       $($vuln.AC)" | Out-File -FilePath $outfile -Append
-                write-output "CVSS Privileges Required:     $($vuln.PR)" | Out-File -FilePath $outfile -Append
-                write-output "CVSS User Interaction:        $($vuln.UI)" | Out-File -FilePath $outfile -Append
-                write-output "CVSS Scope:                   $($vuln.S)" | Out-File -FilePath $outfile -Append
-                write-output "CVSS Confidentiality Impact:  $($vuln.C)" | Out-File -FilePath $outfile -Append
-                write-output "CVSS Integrity Impact:        $($vuln.I)" | Out-File -FilePath $outfile -Append
-                write-output "CVSS Availability Impact:     $($vuln.A)" | Out-File -FilePath $outfile -Append
-                write-output "CVSS Severity:                $($vuln.Severity)" | Out-File -FilePath $outfile -Append
+            #In case the last package has multiple fixed versions, print the high water mark for fixed versions after all have been evaluated
+            if ($component.Recommendation -ne "UNSET") {
+                Write-Output "##############" | Out-File -FilePath $outfile -Append
+                Write-Output "-   Recommended Version to upgrade to that addresses all $($component.name) $($component.version) vulnerabilities: $($component.Recommendation)" | Out-File -FilePath $outfile -Append
+                Write-Output "##############" | Out-File -FilePath $outfile -Append
             }
-
-            Write-Output "License info:  $($vuln.pkglicenses.license.id)" | Out-File -FilePath $outfile -Append
-            Write-Output "" | Out-File -FilePath $outfile -Append
         }
-
-        #In case the last package has multiple fixed versions, print the high water mark for fixed versions after all have been evaluated
-        if ($component.Recommendation -ne "UNSET") {
-            Write-Output "##############" | Out-File -FilePath $outfile -Append
-            Write-Output "-   Recommended Version to upgrade to that addresses all $($component.name) $($component.version) vulnerabilities: $($component.Recommendation)" | Out-File -FilePath $outfile -Append
-            Write-Output "##############" | Out-File -FilePath $outfile -Append
-        }
-    
     }
 
     # Now print out all components with vulnerabilities and where they were found
@@ -284,17 +285,22 @@ function Get-VulnList {
     param(
         [Parameter(Mandatory=$true)][PSObject]$purls,
         [Parameter(Mandatory=$true)][string]$outfile,
-        [Parameter(Mandatory=$true)][boolean]$ListAll
+        [Parameter(Mandatory=$true)][boolean]$ListAll,
+        [Parameter(Mandatory=$true)][decimal]$minScore
     )
     # this function reads through a list of purls and queries the OSV DB using the purl of each component to find all vulnerabilities per component.
     # for each vulnerability, it will collect the summary, deatils, vuln id, fixed version, link to CVSS score calculator, and license info
     # at the end of the component, as well as the recommended upgrade version if all vulnerabilities have been addressed in upgrades
     $fixedHigh = "UNSET"
 
+    $index = 0
+    $validVuln = 0
     foreach ($purl in $purls) {
+        $index++
+        Write-Progress -Activity "Querying OSV for all purls" -Status "$index of $($purls.count) processed" -PercentComplete (($index / $purls.count) * 100)
+
         # Build the JSON body for the OSV API query
         $body = @{
-            "version" = Get-VersionFromPurl($purl)
             "package" = @{
                 "purl" = $purl
             }
@@ -304,7 +310,7 @@ function Get-VulnList {
         try {
             $response = Invoke-WebRequest -uri "https://api.osv.dev/v1/query" -Method POST -Body $body -UseBasicParsing -ContentType 'application/json'
         } catch {
-            Write-Output "StatusDescription:" $_.Exception.Message
+            Write-Output "StatusDescription: $($_.Exception.Message)"
         }
 
         # Check if the response has any vulnerabilities
@@ -389,33 +395,40 @@ function Get-VulnList {
                 $vuln.Fixed = $fixed
                 $fixedHigh = Get-HighVersion -High $fixedHigh -Compare $fixed
                 $component.Recommendation = $fixedHigh
-                $component.Vulns.add($vuln) | Out-Null
+
+                if (($null -ne $vuln.score) -and ($vuln.score -ge $minScore)) {
+                    $validVuln++
+                    Write-Progress -Activity "Number of vulns greater than $minScore" -Status ($validVuln) -Id 1
+    
+                    $component.Vulns.add($vuln) | Out-Null
+                }
             }
 
             #we only want to track components with vulnerabilities once, so only add components that we haven't seen yet in the big list
-            if (Compare-Object -Ref $allvulns -Dif $component -Property Name, Version | Where-Object SideIndicator -eq '=>') {
-                $allvulns.Add($component) | Out-Null
-                $loc = [PSCustomObject]@{
-                  "component" = $component.name;
-                  "version" = $component.version;
-                }
-                foreach ($found in ($componentLocations | Where-Object { ($_.component -eq $loc.component) -and ($_.version -eq $loc.version)})) {
-                    if (Compare-Object -Ref $vulnLocations -Dif $found -Property component, version, file | Where-Object SideIndicator -eq '=>') {
-                        $vulnLocations.add($found) | Out-Null
-                    }
-                }
-             } elseif (Compare-Object -Ref $componentLocations -Dif $component -Property component, version, file | Where-Object SideIndicator -eq '=>') { #but we need to know everywhere that component is found so each project can be fixed
-                $loc = [PSCustomObject]@{
+            if ($component.vulns.count -gt 0) {
+                if (Compare-Object -Ref $allvulns -Dif $component -Property Name, Version | Where-Object SideIndicator -eq '=>') {
+                    $allvulns.Add($component) | Out-Null
+                    $loc = [PSCustomObject]@{
                     "component" = $component.name;
                     "version" = $component.version;
-                }
-                foreach ($found in ($componentLocations | Where-Object { ($_.component -eq $loc.component) -and ($_.version -eq $loc.version)})) {
-                    if (Compare-Object -Ref $vulnLocations -Dif $found -Property component, version, file | Where-Object SideIndicator -eq '=>') {
-                        $vulnLocations.add($found) | Out-Null
+                    }
+                    foreach ($found in ($componentLocations | Where-Object { ($_.component -eq $loc.component) -and ($_.version -eq $loc.version)})) {
+                        if (Compare-Object -Ref $vulnLocations -Dif $found -Property component, version, file | Where-Object SideIndicator -eq '=>') {
+                            $vulnLocations.add($found) | Out-Null
+                        }
+                    }
+                } elseif (Compare-Object -Ref $componentLocations -Dif $component -Property component, version, file | Where-Object SideIndicator -eq '=>') { #but we need to know everywhere that component is found so each project can be fixed
+                    $loc = [PSCustomObject]@{
+                        "component" = $component.name;
+                        "version" = $component.version;
+                    }
+                    foreach ($found in ($componentLocations | Where-Object { ($_.component -eq $loc.component) -and ($_.version -eq $loc.version)})) {
+                        if (Compare-Object -Ref $vulnLocations -Dif $found -Property component, version, file | Where-Object SideIndicator -eq '=>') {
+                            $vulnLocations.add($found) | Out-Null
+                        }
                     }
                 }
             }
-
         } else {
             if ($ListAll) {
                 Write-Output "OSV found no vulnerabilities for $purl licensed with $($pkglicenses.license.id)" | Out-File -FilePath $outfile -Append
@@ -588,7 +601,8 @@ function SBOMResearcher {
         [Parameter(Mandatory=$true)][string]$SBOMPath, #Path to a directory of SBOMs, or path to a single SBOM
         [Parameter(Mandatory=$true)][string]$wrkDir, #Directory where reports will be written, do NOT make it the same as $SBOMPath
         [Parameter(Mandatory=$false)][boolean]$ListAll=$false, #flag to write all components found in report, even if no vulnerabilities found
-        [Parameter(Mandatory=$false)][boolean]$PrintLicenseInfo=$false #flag to print license info in report
+        [Parameter(Mandatory=$false)][boolean]$PrintLicenseInfo=$false, #flag to print license info in report
+        [Parameter(Mandatory=$true)][decimal]$minScore #minimum score to include in report and output
     )
 
     #Begin main script
@@ -626,7 +640,7 @@ function SBOMResearcher {
             }
         }
             if ($null -ne $allpurls) {
-                Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll
+                Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -minScore $minScore
             }
 
             $allVulns | ConvertTo-Json -Depth 5 | Out-Null
@@ -649,7 +663,7 @@ function SBOMResearcher {
                 "Unsupported" { Write-Output "This SBOM type is not supported" | Out-File -FilePath $outfile -Append }
             }
             if ($null -ne $allpurls) {
-                Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll
+                Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -minScore $minScore
             }
             $allVulns | ConvertTo-Json -Depth 5 | Out-Null
 
@@ -657,4 +671,4 @@ function SBOMResearcher {
     }
 }
 
-#SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\sboms" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true
+SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\smalltest" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true -minScore 7.0
