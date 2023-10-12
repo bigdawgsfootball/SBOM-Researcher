@@ -23,13 +23,16 @@ Your SBOMPath may include a mix of CycloneDX and SPDX SBOMs.
 
 ## Usage
 SBOMResearcher -SBOMPath "_{Path to SBOM File or Directory}_" -wrkDir
-"_{Path to Directory for output files}_" [Optional]-ListAll $true [Optional]-PrintLicenseInfo $true\
+"_{Path to Directory for output files}_" [Optional]-ListAll true/false [Optional]-PrintLicenseInfo true/false -minScore decimal\
 \
 It's best if the -wrkDir path is different from the -SBOMPath \
 
 The Optional -ListAll parameter will print every purl evaluated into the
 output file, even if no vulnerabilities are found in it. If not included,
 the default is to only print vulnerabilities found
+
+The minScore parameter will set the level of vulnerabilities to actually report on. 
+Only want to see High / Critical? Pass 7.0 as minScore. Want to see all? Pass 0 as minScore.
 
 ## Best Practices enforcement
 SBOM-Researcher is evaluated against the default set of PSScriptAnalyzer
