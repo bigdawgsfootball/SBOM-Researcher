@@ -7,7 +7,7 @@ function Convert-CVSSStringToBaseScore {
 
     # Validate the input string
     if ($CVSSString -notmatch "CVSS:3\.[01]/AV:[NALP]/AC:[LH]/PR:[NLH]/UI:[NR]/S:[UC]/C:[NLH]/I:[NLH]/A:[NLH]") {
-        Write-Error "Invalid CVSS v3.x string format"
+        throw "Invalid CVSS v3.x string format"
         return
     }
 
@@ -374,7 +374,11 @@ function Get-VulnList {
                         #CVSS 3.0
                         $scoreuri = "https://www.first.org/cvss/calculator/3.0#"
                         $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
-                        $vuln.Score = Convert-CVSSStringToBaseScore $vulnerability.severity.score
+                        try {
+                            $vuln.Score = Convert-CVSSStringToBaseScore $vulnerability.severity.score
+                        } catch {
+                            Write-Output "$_ for $vulnerability" | Out-File -FilePath $outfile -Append
+                        }
 
                         switch ($vuln.Score)
                         {
@@ -388,7 +392,11 @@ function Get-VulnList {
                         #CVSS 3.1
                         $scoreuri = "https://www.first.org/cvss/calculator/3.1#"
                         $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
-                        $vuln.Score = Convert-CVSSStringToBaseScore $vulnerability.severity.score
+                        try {
+                            $vuln.Score = Convert-CVSSStringToBaseScore $vulnerability.severity.score
+                        } catch {
+                            Write-Output "$_ for $vulnerability" | Out-File -FilePath $outfile -Append
+                        }
 
                         switch ($vuln.Score)
                         {
