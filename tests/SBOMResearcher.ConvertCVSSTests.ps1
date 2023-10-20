@@ -55,12 +55,12 @@ Describe "Convert-CVSSStringToBaseScore" {
     It "throws an error for an invalid CVSS v3.1 string" {
         # Arrange
         $CVSSString = "CVSS:3.1/AV:X/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H" # Invalid CVSS string
-    
+
         # Act
         $scriptBlock = { Convert-CVSSStringToBaseScore -CVSSString $CVSSString }
-    
+
         # Assert
         $scriptBlock | Should -Throw -ExpectedMessage "Invalid CVSS v3.x string format"
     }
-    
+
 }
