@@ -6,8 +6,8 @@ function Convert-CVSSStringToBaseScore {
     )
 
     # Validate the input string
-    if ($CVSSString -notmatch "CVSS:3\.1/AV:[NALP]/AC:[LH]/PR:[NLH]/UI:[NR]/S:[UC]/C:[NLH]/I:[NLH]/A:[NLH]") {
-        Write-Error "Invalid CVSS v3.1 string format"
+    if ($CVSSString -notmatch "CVSS:3\.[01]/AV:[NALP]/AC:[LH]/PR:[NLH]/UI:[NR]/S:[UC]/C:[NLH]/I:[NLH]/A:[NLH]") {
+        Write-Error "Invalid CVSS v3.x string format"
         return
     }
 
@@ -247,6 +247,12 @@ function PrintVulnerabilities {
     Write-Output "=========================================================" | Out-File -FilePath $outfile -Append
     Write-Output $componentLocations | Sort-Object -Property component, version | Format-Table | Out-File -FilePath $outfile -Append
 
+    #now output the JSON Objects
+    $vulnFile = "$outfile.vulns.json"
+    $locFile = "$outfile.locs.json"
+    $allcomponents | ConvertTo-Json -Depth 10 | Out-File -FilePath $vulnfile
+    $componentLocations | ConvertTo-Json -Depth 2 | Out-File -FilePath $locFile
+
 }
 
 function Get-VersionFromPurl {
@@ -291,11 +297,12 @@ function Get-VulnList {
     # this function reads through a list of purls and queries the OSV DB using the purl of each component to find all vulnerabilities per component.
     # for each vulnerability, it will collect the summary, deatils, vuln id, fixed version, link to CVSS score calculator, and license info
     # at the end of the component, as well as the recommended upgrade version if all vulnerabilities have been addressed in upgrades
-    $fixedHigh = "UNSET"
 
     $index = 0
     $validVuln = 0
     foreach ($purl in $purls) {
+        $fixedHigh = "UNSET"
+
         $index++
         Write-Progress -Activity "Querying OSV for all purls" -Status "$index of $($purls.count) processed" -PercentComplete (($index / $purls.count) * 100)
 
@@ -310,7 +317,7 @@ function Get-VulnList {
         try {
             $response = Invoke-WebRequest -uri "https://api.osv.dev/v1/query" -Method POST -Body $body -UseBasicParsing -ContentType 'application/json'
         } catch {
-            Write-Output "StatusDescription: $($_.Exception.Message)"
+            Write-Output "OSV search for $purl returned an error: $($_.Exception.Message)"
         }
 
         # Check if the response has any vulnerabilities
@@ -367,14 +374,35 @@ function Get-VulnList {
                         #CVSS 3.0
                         $scoreuri = "https://www.first.org/cvss/calculator/3.0#"
                         $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
+                        $vuln.Score = Convert-CVSSStringToBaseScore $vulnerability.severity.score
+                        
+                        switch ($vuln.Score)
+                        {
+                            { $_ -ge 9.0 }  { $vuln.Severity = "CRITICAL"; Break }
+                            { ($_ -ge 7.0) -and ($_ -lt 9.0) } { $vuln.Severity = "HIGH"; Break }
+                            { ($_ -ge 4.0) -and ($_ -lt 7.0) } { $vuln.Severity = "MEDIUM"; Break }
+                            { ($_ -lt 4.0) } { $vuln.Severity = "LOW"; Break }
+                            default { $vuln.Severity - "UNKNOWN"}
+                        }
                     } elseif ($vulnerability.severity.score.contains("3.1")) {
                         #CVSS 3.1
                         $scoreuri = "https://www.first.org/cvss/calculator/3.1#"
                         $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
                         $vuln.Score = Convert-CVSSStringToBaseScore $vulnerability.severity.score
+                        
+                        switch ($vuln.Score)
+                        {
+                            { $_ -ge 9.0 }  { $vuln.Severity = "CRITICAL"; Break }
+                            { ($_ -ge 7.0) -and ($_ -lt 9.0) } { $vuln.Severity = "HIGH"; Break }
+                            { ($_ -ge 4.0) -and ($_ -lt 7.0) } { $vuln.Severity = "MEDIUM"; Break }
+                            { ($_ -lt 4.0) } { $vuln.Severity = "LOW"; Break }
+                            default { $vuln.Severity - "UNKNOWN"}
+                        }
+
                     } else {
                         #if this string shows up in any output file, need to build a new section for the new score version
                         $vuln.ScoreURI = "UPDATE CODE FOR THIS CVSS SCORE TYPE -> $vulnerability.severity.score"
+                        $vuln.Severity = "UNKNOWN"
                     }
                 }
 
@@ -398,8 +426,8 @@ function Get-VulnList {
 
                 if (($null -ne $vuln.score) -and ($vuln.score -ge $minScore)) {
                     $validVuln++
-                    Write-Progress -Activity "Number of vulns greater than $minScore" -Status ($validVuln) -Id 1
-    
+                    Write-Progress -Activity "Number of OSV vulns greater than $minScore" -Status ($validVuln) -Id 1
+
                     $component.Vulns.add($vuln) | Out-Null
                 }
             }
@@ -431,7 +459,7 @@ function Get-VulnList {
             }
         } else {
             if ($ListAll) {
-                Write-Output "OSV found no vulnerabilities for $purl licensed with $($pkglicenses.license.id)" | Out-File -FilePath $outfile -Append
+                Write-Output "OSV found no vulnerabilities for $purl" | Out-File -FilePath $outfile -Append
             }
         }
     }
@@ -496,7 +524,6 @@ function Get-CycloneDXComponentList {
                     "file" = $file
                   }
                   $componentLocations.Add($loc) | Out-Null
-
             }
         } elseif ($type -eq "operating-system") {
             #OSV does not return good info on Operating Systems, just need to report OS and version for investigation
@@ -578,11 +605,9 @@ function Get-SPDXComponentList {
                         "file" = $file
                       }
                       $componentLocations.Add($loc) | Out-Null
-
                 }
             }
         }
-
     }
 
     if ($PrintLicenseInfo) {
@@ -671,4 +696,4 @@ function SBOMResearcher {
     }
 }
 
-#SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\smalltest" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true -minScore 7.0
+SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\smalltest" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true -minScore 7.0
