@@ -375,7 +375,7 @@ function Get-VulnList {
                         $scoreuri = "https://www.first.org/cvss/calculator/3.0#"
                         $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
                         $vuln.Score = Convert-CVSSStringToBaseScore $vulnerability.severity.score
-                        
+
                         switch ($vuln.Score)
                         {
                             { $_ -ge 9.0 }  { $vuln.Severity = "CRITICAL"; Break }
@@ -389,7 +389,7 @@ function Get-VulnList {
                         $scoreuri = "https://www.first.org/cvss/calculator/3.1#"
                         $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
                         $vuln.Score = Convert-CVSSStringToBaseScore $vulnerability.severity.score
-                        
+
                         switch ($vuln.Score)
                         {
                             { $_ -ge 9.0 }  { $vuln.Severity = "CRITICAL"; Break }
@@ -696,4 +696,4 @@ function SBOMResearcher {
     }
 }
 
-SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\smalltest" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true -minScore 7.0
+#SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\smalltest" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true -minScore 7.0
