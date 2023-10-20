@@ -39,4 +39,22 @@ jobs:
           name: Pester-License-Tests
           path: LicenseTest-Pester.XML
     if: ${{ always() }}
-
+  pester-cvssscoretest:
+    name: Pester CVSS Score Conversion test
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Perform a Pester test from the SBOMResearcher.LicenseTests.ps1 file
+        shell: pwsh
+        run: |
+          Set-PSRepository psgallery -InstallationPolicy trusted
+          Install-Module -Name Pester -Confirm:$false -RequiredVersion 5.0.4 -Force
+          . .\SBOMResearcher.ps1
+          Invoke-Pester -Script .\tests\SBOMResearcher.ConvertCVSSTests.ps1 -OutputFile "./ConvertCVSSTest-Pester.XML" -OutputFormat "NUnitXML" -Passthru -Verbose
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: Pester-CVSSScore-Tests
+          path: ConvertCVSSTest-Pester.XML
+    if: ${{ always() }}
