@@ -1,60 +1,22 @@
 name: Pester
 on: push
 jobs:
-  pester-versiontest:
-    name: Pester Version test
+  pester-tests:
+    name: Pester tests
     runs-on: windows-latest
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
-      - name: Perform a Pester test from the SBOMResearcher.VersionTests.ps1 file
+      - name: Perform all Pester tests from the SBOMResearcher tests directory
         shell: pwsh
         run: |
           Set-PSRepository psgallery -InstallationPolicy trusted
           Install-Module -Name Pester -Confirm:$false -RequiredVersion 5.0.4 -Force
           . .\SBOMResearcher.ps1
-          Invoke-Pester -Script .\tests\SBOMResearcher.VersionTests.ps1 -OutputFile "./VersionTest-Pester.XML" -OutputFormat "NUnitXML" -Passthru -Verbose
+          Invoke-Pester -Script .\tests -OutputFile "./Pester.XML" -OutputFormat "NUnitXML" -Passthru -Verbose
       - name: Upload test results
         uses: actions/upload-artifact@v3
         with:
           name: Pester-Version-Tests
-          path: VersionTest-Pester.XML
-    if: ${{ always() }}
-  pester-licensetest:
-    name: Pester License test
-    runs-on: windows-latest
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v3
-      - name: Perform a Pester test from the SBOMResearcher.LicenseTests.ps1 file
-        shell: pwsh
-        run: |
-          Set-PSRepository psgallery -InstallationPolicy trusted
-          Install-Module -Name Pester -Confirm:$false -RequiredVersion 5.0.4 -Force
-          . .\SBOMResearcher.ps1
-          Invoke-Pester -Script .\tests\SBOMResearcher.LicenseTests.ps1 -OutputFile "./LicenseTest-Pester.XML" -OutputFormat "NUnitXML" -Passthru -Verbose
-      - name: Upload test results
-        uses: actions/upload-artifact@v3
-        with:
-          name: Pester-License-Tests
-          path: LicenseTest-Pester.XML
-    if: ${{ always() }}
-  pester-cvssscoretest:
-    name: Pester CVSS Score Conversion test
-    runs-on: windows-latest
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v3
-      - name: Perform a Pester test from the SBOMResearcher.LicenseTests.ps1 file
-        shell: pwsh
-        run: |
-          Set-PSRepository psgallery -InstallationPolicy trusted
-          Install-Module -Name Pester -Confirm:$false -RequiredVersion 5.0.4 -Force
-          . .\SBOMResearcher.ps1
-          Invoke-Pester -Script .\tests\SBOMResearcher.ConvertCVSSTests.ps1 -OutputFile "./ConvertCVSSTest-Pester.XML" -OutputFormat "NUnitXML" -Passthru -Verbose
-      - name: Upload test results
-        uses: actions/upload-artifact@v3
-        with:
-          name: Pester-CVSSScore-Tests
-          path: ConvertCVSSTest-Pester.XML
+          path: Pester.XML
     if: ${{ always() }}
