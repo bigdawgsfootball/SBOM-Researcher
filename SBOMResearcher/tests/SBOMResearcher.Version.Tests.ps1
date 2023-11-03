@@ -1,6 +1,6 @@
 BeforeAll {
-# Import the function to test
-. .\SBOMResearcher.ps1
+    # Import the function to test
+    . .\SBOMResearcher.ps1
 }
 
 # Define the test cases for Get-HighVersion
@@ -17,7 +17,8 @@ $testCases = @(
 
 # Run the tests for Get-HighVersion
 Describe 'Get-HighVersion' {
-    It 'returns <Expected> when High is <High> and Compare is <Compare>' -TestCases $testCases {
+
+    It "returns <Expected> when High is <High> and Compare is <Compare>" -ForEach $testCases {
         param($High, $Compare, $Expected)
         Get-HighVersion -High $High -Compare $Compare | Should -Be $Expected
     }

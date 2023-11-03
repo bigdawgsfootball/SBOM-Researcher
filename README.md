@@ -8,37 +8,52 @@ managed by Google. It will then report back with the list of vulnerabilities
 published for each package, and will provide a link to a page detailing the
 CVSS score for each vulnerability if the CVSS score was provided.
 
-Each vulnerability in the report will list the Component Name and Version, and a list containing Vulnerability Name, Vulnerability Database Source, Summary, Details, Fixed Version if available, a link to a CVSS Score visualizer, a calculated CVSS Score, a breakdown of each CVSS Score components, a calculation of the CVSS Score severity, and any liscense info if the -PrintLicenseInfo parameter was $true for each vulnerability found of the component that exceeded the -minScore parameter.
+Each vulnerability in the report will list the Vulnerability ID, Summary,
+Details, Fixed Version, a calculated CVSS score, and a calculated CVSS Score link, if supplied.
 
-A rollup summary for each component in the report will indicate if there is a Version you could upgrade to that will address all vulnerabilities.
+A rollup summary for each component in the report will indicate if there is a Version
+you could upgrade to that will address all vulnerabilities.
 
-A rollup summary at the end of the report can indicate (if commandline option provided) an assessed risk level of all open source licenses that were found.
+A rollup summary at the end of the report can indicate (if commandline option provided)
+an assessed action level of all open source licenses that were found.
 
-All of the above information will be contained in the _ProjectName__report.txt output file. 2 other files are created which contain json representations of the vulnerabilities found and a mapping to the SBOM files they were found in.
+Also included in the output are JSON formated files showing all vulnerabilities found greater than the -minScore
+parameter, and another JSON file showing which SBOM files they were found in.
 
-Has been tested reasonably so far against CycloneDX formated SBOMs.
+Has been reasonably tested so far against CycloneDX formated SBOMs.
 This is the initial attempt for including SPDX formated SBOMs.
 Your SBOMPath may include a mix of CycloneDX and SPDX SBOMs.
-
 ## Usage
 SBOMResearcher -SBOMPath "_{Path to SBOM File or Directory}_" -wrkDir
-"_{Path to Directory for output files}_" [_Optional_]-ListAll true/false [_Optional_]-PrintLicenseInfo true/false -minScore decimal
+"_{Path to Directory for output files}_" [Optional]-ListAll boolean [Optional]-PrintLicenseInfo boolean [Optional]-useIonChannel boolean [Optional]-minScore boolean [Optional]-token string\
+\
+It's best if the -wrkDir path is different from the -SBOMPath \
+Currently fileshare.resource.jwac.mil\temp\SBOMResearch\ _{ProjectName}_ is
+a good place for -wrkDir
 
-It's best if the -wrkDir path is different from the -SBOMPath
-
-The Optional -ListAll parameter will print every component evaluated into the
+The Optional -ListAll parameter will print every purl evaluated into the
 output file, even if no vulnerabilities are found in it. If not included,
-the default is to only print components with vulnerabilities found that exceed the value of the -minScore parameter.
+the default is to only print vulnerabilities found
 
-The minScore parameter will set the level of vulnerabilities to actually report on. Only want to see High / Critical? Pass 7.0 as minScore. Want to see all? Pass 0 as minScore.
+The Optional -PrintLicenseInfo parameter will include all licenses found in the SBOM organized by action categories. This should be included in SBOMs for code we have developed.
+
+The Optional -useIonChannel parameter will search Ion Channel as well as OSV. This is a licesensed tool that STRATCOM lets us use. If they run short on licenses, we may need to turn off.
+
+The Optional -minScore parameter will set the minimum CVSS score of Ion Channel vulnerabilities that will be returned in the report. Default is 7.0, the lowest High CVSS score.
+
+The Optional -token parameter is only used when run in a CI/CD pipeline when querying Ion Channel, and should contain the GitLab token for Vault.
 
 ## Best Practices enforcement
 SBOM-Researcher is evaluated against the default set of PSScriptAnalyzer
-rules. All rules are enforced.
+rules. All rules are enforced. \
+Help documentation limited to the Usage section, comments in code, and the [How to use SBOMs at JWAC](https://urxjira.resource.jwac.mil:8444/download/attachments/70516958/How%20to%20deal%20with%20SBOMs%20at%20JWAC.docx?api=v2) document.\
+Important functions identified as Get-HighVersion, PrintLicenses and Convert-CVSSStringToBaseScore.
+Pester tests implemented against Get-HighVersion, PrintLicenses and Convert-CVSSStringToBaseScore functions.
 
-Help documentation limited to the Usage section and comments in code.
+## Code Review
+This script produces results which direct compliance activities, and as such should be peer reviewed before use.
 
-Pester tests implemented against Convert-CVSSStringToBaseScore, Get-HighVersion and PrintLicenses functions.
+Code reviewed by Pacey Long on 2023.11.01
 
 ## Project status
 Under active development

@@ -67,7 +67,7 @@ function Convert-CVSSStringToBaseScore {
 
     # Calculate the impact sub-score using the formula from the CVSS specification
     $ISSBase = 1 - ((1 - $CWeights[$values[5]]) * (1 - $IWeights[$values[6]]) * (1 - $AWeights[$values[7]]))
-
+    
     # Adjust the impact sub-score based on the scope metric value using the formula from the CVSS specification
     if ($values[4] -eq "U") {
         $ISSFinal = 6.42 * $ISSBase
@@ -154,37 +154,73 @@ function PrintLicenses {
     )
 
     $licstr = ""
-    $LowRisk = ""
-    $MedRisk = ""
-    $HighRisk = ""
+    $LowAction = ""
+    $MedAction = ""
+    $HighAction = ""
+    $LowObj = [System.Collections.Generic.List[PSObject]]::new()
+    $MedObj = [System.Collections.Generic.List[PSObject]]::new()
+    $HighObj = [System.Collections.Generic.List[PSObject]]::new()
+    $UnmappedObj = [System.Collections.Generic.List[PSObject]]::new()
+    $AllObj = [System.Collections.Generic.List[PSObject]]::new()
 
-    #Low Risk licenses generally do not require any action / attribution to include or modify the code
-    $LowRiskLicenses = @("MIT", "Apache-2.0", "ISC", "BSD-4-Clause", "BSD-3-Clause", "BSD-2-Clause", "BSD-1-Clause", "BSD-4-Clause-UC", "Unlicense", "Zlib", "Libpng", "Wtfpl-2.0", "OFL-1.1", "Edl-v10", "CCA-4.0", "0BSD", "CC0-1.0", "BSD-2-Clause-NetBSD", "Beerware", "PostgreSQL", "OpenSSL", "W3C", "HPND", "curl", "NTP", "WTFPL")
-    #Medium Risk licenses require some action in order to use or modify the code in a deritive work
-    $MedRiskLicenses = @("EPL-2.0", "MPL-1.0", "MPL-1.1", "MPL-2.0", "EPL-1.0", "CDDL-1.1", "AFL-2.1", "CPL-1.0", "CC-BY-4.0", "Artistic-2.0", "CC-BY-3.0", "AFL-3.0", "BSL-1.0", "OLDAP-2.8", "Python-2.0", "Ruby")
-    #High Risk licenses often require actions that we may not be able to take, like applying a copyright on the deritive work or applying the same license to the deritive work
-    $HighRiskLicenses = @("LGPL-2.0-or-later", "LGPL-2.1-or-later", "GPL-2.0-or-later", "GPL-2.0-only", "GPL-3.0-or-later", "GPL-2.0+", "GPL-3.0+", "LGPL-2.0", "LGPL-2.0+", "LGPL-2.1", "LGPL-2.1+", "LGPL-3.0", "LGPL-3.0+", "GPL-2.0", "CC-BY-3.0-US", "CC-BY-SA-3.0", "GFDL-1.2", "GFDL-1.3", "GPL-3.0", "GPL-1.0", "GPL-1.0+", "IJG", "AGPL-3.0", "CC-BY-SA-4.0")
+    #Low Action licenses generally require very little action / attribution to include or modify the code
+    $LowActionLicenses = @("GFDL-1.3-or-later", "GFDL-1.3-only", "GFDL-1.2-or-later", "GFDL-1.2-only", "Apache", "Apache 2.0", "GNU", "MIT", "MIT License", "Apache-2.0", "ISC", "BSD", "BSD-4-Clause", "BSD-3", "BSD-3-Clause", "BSD-2-Clause", "BSD-1-Clause", "BSD-4-Clause-UC", "Unlicense", "Zlib", "Libpng", "Wtfpl-2.0", "OFL-1.1", "Edl-v10", "CCA-4.0", "0BSD", "CC0", "CC0-1.0", "BSD-2-Clause-NetBSD", "Beerware", "PostgreSQL", "OpenSSL", "W3C", "HPND", "curl", "NTP", "WTFPL")
+    #Medium Action licenses require some action in order to use or modify the code in a deritive work
+    $MedActionLicenses = @("IPL-1.0", "EPL-2.0", "MPL-1.0", "MPL-1.1", "MPL-2.0", "EPL-1.0", "CDDL-1.1", "AFL-2.1", "CPL-1.0", "CC-BY-4.0", "Artistic", "Artistic-2.0", "CC-BY-3.0", "AFL-3.0", "BSL-1.0", "OLDAP-2.8", "Python-2.0", "Ruby", "X11", "PSF-2.0", "Python", "Python Software Foundation License")
+    #High Action licenses often require actions that we may not be able to take, like applying a copyright on the deritive work (which gov't produced code can't do) or applying the same license to the deritive work (which gov't produced code is licensed differently)
+    $HighActionLicenses = @("AGPL-3.0-or-later", "AGPL-3.0-only", "GPL-1.0-or-later", "GPL-3.0-only", "GPL-1.0-only", "LGPL-2.1-only", "LGPL-2.0-only", "LGPL-3.0-only", "GPL", "LGPL", "LGPL-2.0-or-later", "LGPL-2.1-or-later", "GPL-2.0-or-later", "GPL-2.0-only", "GPL-3.0-or-later", "GPL-2.0+", "GPLv2+", "GPL-2.1+", "GPL-3.0+", "LGPL-2.0", "LGPL-2.0+", "LGPL-2.1", "LGPL-2.1+", "LGPL-3.0", "LGPL-3.0+", "GPL-2.0", "CC-BY-3.0-US", "CC-BY-SA-3.0", "GFDL-1.2", "GFDL-1.3", "GPL-3.0", "GPL-1.0", "GPL-1.0+", "IJG", "AGPL-3.0", "CC-BY-SA-4.0")
 
-    #determine all the license risk categories
+    #determine all the license Action categories
     foreach ($lic in $alllicenses) {
-        if ($LowRiskLicenses.Contains($lic)) {
-            $LowRisk += $lic + "   "
-        } elseif ($MedRiskLicenses.Contains($lic)) {
-            $MedRisk += $lic + "   "
-        } elseif ($HighRiskLicenses.Contains($lic)) {
-            $HighRisk += $lic + "   "
+        if (($LowActionLicenses.Contains($lic)) -and ($lic -notin $LowAction)) {
+            $LowAction += $lic + "   "
+            $element = @{
+                License = $lic
+                Type = "LOW"
+            }
+            $LowObj.add($element)
+        } elseif (($MedActionLicenses.Contains($lic))-and ($lic -notin $MedAction)) {
+            $MedAction += $lic + "   "
+            $element = @{
+                License = $lic
+                Type = "MEDIUM"
+            }
+            $MedObj.add($element)
+        } elseif (($HighActionLicenses.Contains($lic)) -and ($lic -notin $HighAction)){
+            $HighAction += $lic + "   "
+            $element = @{
+                License = $lic
+                Type = "HIGH"
+            }
+            $HighObj.add($element)
         } else {
-            $licstr += $lic + "   "
+            if ( -not($licstr.Contains($lic))) {
+                $licstr += $lic + "   "
+                $element = @{
+                    License = $lic
+                    Type = "UNMAPPED"
+                }
+                $UnmappedObj.add($element)
+            }
         }
     }
 
     #Print out all unique licenses found in the SBOM
     Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
-    Write-Output "-   Low Risk Licenses found in this SBOM:  $LowRisk" | Out-File -FilePath $outfile -Append
-    Write-Output "-   Medium Risk Licenses found in this SBOM:  $MedRisk" | Out-File -FilePath $outfile -Append
-    Write-Output "-   High Risk Licenses found in this SBOM:  $HighRisk" | Out-File -FilePath $outfile -Append
+    Write-Output "-   Low Action Licenses found in this SBOM:  $LowAction" | Out-File -FilePath $outfile -Append
+    Write-Output "-   Medium Action Licenses found in this SBOM:  $MedAction" | Out-File -FilePath $outfile -Append
+    Write-Output "-   High Action Licenses found in this SBOM:  $HighAction" | Out-File -FilePath $outfile -Append
     Write-Output "-   Unmapped Licenses found in this SBOM:  $licstr" | Out-File -FilePath $outfile -Append
     Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
+
+    #now output the JSON Objects
+    $name = $file.name.replace(".","_")
+    $licenseFile = "$wrkDir\$name.license.json"
+    #$AllObj = $UnmappedObj, $HighObj, $MedObj, $LowObj | ConvertTo-Json -Depth 2 | Out-File -FilePath $licensefile
+    $AllObj = @{ "Unmapped" = $UnmappedObj; "High" = $HighObj; "Medium" = $MedObj; "Low" = $LowObj } | ConvertTo-Json -Depth 2
+    $AllObj | Out-File -FilePath $licensefile
+
+    
 }
 
 function PrintVulnerabilities {
@@ -200,7 +236,10 @@ function PrintVulnerabilities {
             Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
             Write-Output "-   Component: $($component.name) $($component.version)" | Out-File -FilePath $outfile -Append
             Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
+            Write-Output "License info:  $($component.license)" | Out-File -FilePath $outfile -Append
+            Write-Output "" | Out-File -FilePath $outfile -Append
 
+            
             foreach ($vuln in $component.Vulns) {
                 # Print the vulnerability details
                 # some vulnerabilities do not return a summary or fixed version
@@ -228,7 +267,6 @@ function PrintVulnerabilities {
                     write-output "CVSS Severity:                $($vuln.Severity)" | Out-File -FilePath $outfile -Append
                 }
 
-                Write-Output "License info:  $($vuln.pkglicenses.license.id)" | Out-File -FilePath $outfile -Append
                 Write-Output "" | Out-File -FilePath $outfile -Append
             }
 
@@ -248,11 +286,11 @@ function PrintVulnerabilities {
     Write-Output $componentLocations | Sort-Object -Property component, version | Format-Table | Out-File -FilePath $outfile -Append
 
     #now output the JSON Objects
-    $vulnFile = "$outfile.vulns.json"
-    $locFile = "$outfile.locs.json"
+    $vulnFile = "$wrkDir\$($ProjectName)_vulns.json"
+    $locFile = "$wrkDir\$($ProjectName)_locs.json"
     $allcomponents | ConvertTo-Json -Depth 10 | Out-File -FilePath $vulnfile
     $componentLocations | ConvertTo-Json -Depth 2 | Out-File -FilePath $locFile
-
+    
 }
 
 function Get-VersionFromPurl {
@@ -297,9 +335,38 @@ function Get-VulnList {
     # this function reads through a list of purls and queries the OSV DB using the purl of each component to find all vulnerabilities per component.
     # for each vulnerability, it will collect the summary, deatils, vuln id, fixed version, link to CVSS score calculator, and license info
     # at the end of the component, as well as the recommended upgrade version if all vulnerabilities have been addressed in upgrades
+    # if $useIonChannel is true, it will do the same for Ion Channel queries
 
     $index = 0
     $validVuln = 0
+    $ionVulns = 0
+
+    # if querying Ion Channel, need to pull the API Token from Vault
+    if (($useIonChannel) -and ($token -eq "")) { # user based query, need to get their personal token
+        $mySecureToken = Read-Host "Enter your personal Vault Token" -AsSecureString
+
+        $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($mySecureToken)
+        $myToken = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+
+        $headers = @{
+            'Accept' = 'application/json'
+            'X-Vault-Token' = $myToken
+        }
+        
+        $uri = "https://vault.service.consul:8200/v1/jwt/data/apikeys/IonChannel"
+        $response = Invoke-RestMethod -Method Get -Headers $headers -Uri $uri
+        $apiToken = $response.data.data.APIToken            
+    } elseif (($useIonChannel) -and ($token -eq "")) { # GitLab based query, need to use the GitLab token
+        $headers = @{
+            'Accept' = 'application/json'
+            'X-Vault-Token' = $token
+        }
+        
+        $uri = "https://vault.service.consul:8200/v1/jwt/data/apikeys/IonChannel"
+        $response = Invoke-RestMethod -Method Get -Headers $headers -Uri $uri
+        $apiToken = $response.data.data.APIToken            
+    }
+
     foreach ($purl in $purls) {
         $fixedHigh = "UNSET"
 
@@ -308,8 +375,9 @@ function Get-VulnList {
 
         # Build the JSON body for the OSV API query
         $body = @{
+            #"version" = Get-VersionFromPurl($purl)
             "package" = @{
-                "purl" = $purl
+                "purl" = $purl.purl
             }
         } | ConvertTo-Json
 
@@ -317,19 +385,20 @@ function Get-VulnList {
         try {
             $response = Invoke-WebRequest -uri "https://api.osv.dev/v1/query" -Method POST -Body $body -UseBasicParsing -ContentType 'application/json'
         } catch {
-            Write-Output "OSV search for $purl returned an error: $($_.Exception.Message)"
+            Write-Output "OSV search for $($purl.purl) returned an error: $($_.Exception.Message)"
         }
 
         # Check if the response has any vulnerabilities
         if ($response.Content.length -gt 2) {
-            $name = Get-NameFromPurl($purl)
-            $version = Get-VersionFromPurl($purl)
+            $name = Get-NameFromPurl($purl.purl)
+            $version = Get-VersionFromPurl($purl.purl)
 
             # build new object to store all properties
             $component = [PSCustomObject]@{
                 Name = $name
                 Version = $version
                 Recommendation = ""
+                License = $purl.license
                 Vulns = [System.Collections.ArrayList]@()
             }
 
@@ -337,7 +406,7 @@ function Get-VulnList {
 
             # Loop through each vulnerability in the response
             foreach ($vulnerability in $vulns.vulns) {
-
+                
                 # build new object to store all properties
                 $vuln = [PSCustomObject]@{
                     ID = $vulnerability.id
@@ -379,7 +448,7 @@ function Get-VulnList {
                         } catch {
                             Write-Output "$_ for $vulnerability" | Out-File -FilePath $outfile -Append
                         }
-
+                        
                         switch ($vuln.Score)
                         {
                             { $_ -ge 9.0 }  { $vuln.Severity = "CRITICAL"; Break }
@@ -435,18 +504,18 @@ function Get-VulnList {
                 if (($null -ne $vuln.score) -and ($vuln.score -ge $minScore)) {
                     $validVuln++
                     Write-Progress -Activity "Number of OSV vulns greater than $minScore" -Status ($validVuln) -Id 1
-
-                    $component.Vulns.add($vuln) | Out-Null
-                }
+    
+                $component.Vulns.add($vuln) | Out-Null
             }
+        }
 
             #we only want to track components with vulnerabilities once, so only add components that we haven't seen yet in the big list
             if ($component.vulns.count -gt 0) {
                 if (Compare-Object -Ref $allvulns -Dif $component -Property Name, Version | Where-Object SideIndicator -eq '=>') {
                     $allvulns.Add($component) | Out-Null
                     $loc = [PSCustomObject]@{
-                    "component" = $component.name;
-                    "version" = $component.version;
+                        "component" = $component.name;
+                        "version" = $component.version;
                     }
                     foreach ($found in ($componentLocations | Where-Object { ($_.component -eq $loc.component) -and ($_.version -eq $loc.version)})) {
                         if (Compare-Object -Ref $vulnLocations -Dif $found -Property component, version, file | Where-Object SideIndicator -eq '=>') {
@@ -467,11 +536,102 @@ function Get-VulnList {
             }
         } else {
             if ($ListAll) {
-                Write-Output "OSV found no vulnerabilities for $purl" | Out-File -FilePath $outfile -Append
+                Write-Output "OSV found no vulnerabilities for $(purl.purl)" | Out-File -FilePath $outfile -Append
+            }
+        }
+
+        if ($useIonChannel) {
+            # Query Ion Channel as well
+            Write-Progress -Activity "Querying Ion Channel for all purls" -Status "$index of $($purls.count) processed" -PercentComplete (($index / $purls.count) * 100) -ID 2
+
+            # limit will restrict how many vulnerabilities are returned
+            $name = Get-NameFromPurl($purl.purl)
+            $version = Get-VersionFromPurl($purl.purl)
+
+            # build new object to store all properties
+            $component = [PSCustomObject]@{
+                Name     = $name
+                Version = $version
+                License = $purl.license
+                Recommendation = ""
+                Vulns = [System.Collections.ArrayList]@()
+            }
+            
+            $body = @{
+                "product" = $name
+                "version" = $version
+                "limit" = "100"
+            }
+            try {
+                $response = Invoke-WebRequest -uri "https://api.ionchannel.io/v1/vulnerability/getVulnerabilities" -Method GET -Headers @{"Authorization" = "Bearer $apiToken"} -Body $body -UseBasicParsing -ContentType 'application/json'
+            } catch {
+                Write-Output "Ion Channel search for $($purl.purl) returned an error: $($_.Exception.Message)"
+            }
+            $result = $response.content | convertfrom-json
+
+            if ($result.data.count -gt 0) {
+                # Ion Channel actually breaks out the CVSS score sections and provides a base score, don't need the calculator page
+                foreach ($vuln in $result.data) {
+                    # build new object to store all properties
+                    $vulnerability = [PSCustomObject]@{
+                        Score = $vuln.score
+                        ID = $vuln.external_id
+                        Summary = $vuln.summary
+                        Details = $vuln.details
+                        Source = $vuln.source.description
+                        AV = $vuln.score_details.cvssv3.attackVector
+                        AC = $vuln.score_details.cvssv3.attackComplexity
+                        PR = $vuln.score_details.cvssv3.privilegesRequired
+                        UI = $vuln.score_details.cvssv3.userInteraction
+                        S = $vuln.score_details.cvssv3.scope
+                        C = $vuln.score_details.cvssv3.confidentialityImpact
+                        I = $vuln.score_details.cvssv3.integrityImpact
+                        A = $vuln.score_details.cvssv3.availabilityImpact
+                        ScoreURI = $vuln.score_details.cvssv3.vectorString
+                        Severity = $vuln.score_details.cvssv3.baseSeverity
+                    }
+                    $component.Recommendation = $vuln.recommendation
+
+                    if (($null -ne $vuln.score) -and ($vuln.score -ge $minScore)) {
+                        $ionVulns++
+                        Write-Progress -Activity "Number of Ion Channel vulns greater than $minScore" -Status ($ionVulns) -ID 3
+
+                        $component.Vulns.add($vulnerability) | Out-Null
+                    }
+
+                    #we only want to track components with vulnerabilities once
+                    if ($component.vulns.count -gt 0) {
+                        if (Compare-Object -Ref $allvulns -Dif $component -Property Name, Version, Source | Where-Object SideIndicator -eq '=>') {
+                            $allvulns.Add($component) | Out-Null
+                            $loc = [PSCustomObject]@{
+                                "component" = $component.name;
+                                "version" = $component.version;
+                            }
+                            foreach ($found in ($componentLocations | Where-Object { ($_.component -eq $loc.component) -and ($_.version -eq $loc.version)})) {
+                                if (Compare-Object -Ref $vulnLocations -Dif $found -Property component, version, file | Where-Object SideIndicator -eq '=>') {
+                                    $vulnLocations.add($found) | Out-Null
+                                }
+                            }
+                        } elseif (Compare-Object -Ref $componentLocations -Dif $component -Property component, version, file | Where-Object SideIndicator -eq '=>') { #but we need to know everywhere that component is found so each project can be fixed
+                            $loc = [PSCustomObject]@{
+                                "component" = $component.name;
+                                "version" = $component.version;
+                            }
+                            foreach ($found in ($componentLocations | Where-Object { ($_.component -eq $loc.component) -and ($_.version -eq $loc.version)})) {
+                                if (Compare-Object -Ref $vulnLocations -Dif $found -Property component, version, file | Where-Object SideIndicator -eq '=>') {
+                                    $vulnLocations.add($found) | Out-Null
+                                }
+                            }
+                        }
+                    }
+                } 
+            } else {
+                if ($ListAll) {
+                    Write-Output "Ion Channel found no vulnerabilities for $($purl.purl)" | Out-File -FilePath $outfile -Append
+                }
             }
         }
     }
-
 }
 
 function Get-SBOMType {
@@ -499,7 +659,8 @@ function Get-CycloneDXComponentList {
         [Parameter(Mandatory=$true)][PSObject]$allLicenses
     )
 
-    $purlList = @()
+    #$purlList = @()
+    $purlList = [System.Collections.Generic.List[PSOBJECT]]::new()
 
     foreach ($package in $SBOM.components) {
         $type = $package.type
@@ -517,21 +678,32 @@ function Get-CycloneDXComponentList {
                 if ($null -ne $license.license.id) {
                     $allLicenses += $license.license.id
                 }
-            } else {
-                $found = $false
             }
         }
 
         if ($type -eq "library" -or $type -eq "framework") {
             # Get the component purl
             if ($package.purl -notin $allpurls) {
-                $purlList += $package.purl
+                if ($null -ne $license.license.id) {
+                    $packageInfo = [PSCustomObject]@{
+                        "purl" = $package.purl
+                        "license" = $license.license.id
+                    }
+                } else {
+                    $packageInfo = [PSCustomObject]@{
+                        "purl" = $package.purl
+                        "license" = "NOASSERTION"
+                    }
+                }
+             
+                #$purlList += $package.purl
+                $purlList.Add($packageInfo)
                 $loc = [PSCustomObject]@{
                     "component" = Get-NameFromPurl -purl $package.purl;
                     "version" = Get-VersionFromPurl -purl $package.purl;
                     "file" = $file
-                  }
-                  $componentLocations.Add($loc) | Out-Null
+                }
+                $componentLocations.Add($loc) | Out-Null
             }
         } elseif ($type -eq "operating-system") {
             #OSV does not return good info on Operating Systems, just need to report OS and version for investigation
@@ -569,7 +741,8 @@ function Get-SPDXComponentList {
         [Parameter(Mandatory=$true)][PSObject]$allLicenses
     )
 
-    $purlList = @()
+    #$purlList = @()
+    $purlList = [System.Collections.Generic.List[PSOBJECT]]::new()
 
     foreach ($package in $SBOM.packages) {
         $decLicense = $package.licenseDeclared
@@ -606,13 +779,26 @@ function Get-SPDXComponentList {
             if ($refType.referenceType -eq "purl") {
                 # Get the component purl
                 if ($refType.referenceLocator -notin $allpurls) {
-                    $purlList += $refType.referenceLocator
+                    #$purlList += $refType.referenceLocator
+                    if ($found) {
+                        $packageInfo = [PSCustomObject]@{
+                            "purl" = $refType.referenceLocator
+                            "license" = "$decLicense + $conlicense"
+                        }
+                } else {
+                    $packageInfo = [PSCustomObject]@{
+                        "purl" = $refType.referenceLocator
+                        "license" = "NOASSERTION"
+                    }
+                }
+                    $purlList.Add($packageInfo)
+    
                     $loc = [PSCustomObject]@{
                         "component" = Get-NameFromPurl -purl $refType.referenceLocator;
                         "version" = Get-VersionFromPurl -purl $refType.referenceLocator;
                         "file" = $file
-                      }
-                      $componentLocations.Add($loc) | Out-Null
+                    }
+                    $componentLocations.Add($loc) | Out-Null
                 }
             }
         }
@@ -631,11 +817,14 @@ function Get-SPDXComponentList {
 function SBOMResearcher {
     [CmdletBinding()]
     param(
+        [Parameter(Mandatory=$true)][string]$ProjectName, #Name associated with project, seen in output filenames and official SBOM folder path
         [Parameter(Mandatory=$true)][string]$SBOMPath, #Path to a directory of SBOMs, or path to a single SBOM
         [Parameter(Mandatory=$true)][string]$wrkDir, #Directory where reports will be written, do NOT make it the same as $SBOMPath
+        [Parameter(Mandatory=$true)][decimal]$minScore, #minimum score to include in report and output
         [Parameter(Mandatory=$false)][boolean]$ListAll=$false, #flag to write all components found in report, even if no vulnerabilities found
         [Parameter(Mandatory=$false)][boolean]$PrintLicenseInfo=$false, #flag to print license info in report
-        [Parameter(Mandatory=$true)][decimal]$minScore #minimum score to include in report and output
+        [Parameter(Mandatory=$false)][boolean]$useIonChannel=$false, #include Ion Channel results in search
+        [Parameter(Mandatory=$false)][string]$token="" #for CI/CD pipeline processing, token to look up IonChannel token in Vault
     )
 
     #Begin main script
@@ -651,19 +840,18 @@ function SBOMResearcher {
     $componentLocations=[System.Collections.ArrayList]@()
     $vulnLocations=[System.Collections.ArrayList]@()
 
-
     $argType = Get-Item $SBOMPath
     if ($argType.PSIsContainer) {
         #directory
-        $outfile = $wrkDir + "\" + $argType.Parent.Name + "_report.txt"
-        Write-Output "SBOMResearcher Report for Project: $($argType.Parent)" | Out-File -FilePath $outfile
+        $outfile = $wrkDir + "\" + $ProjectName + "_report.txt"
+        Write-Output "SBOMResearcher Report for Project: $ProjectName" | Out-File -FilePath $outfile
         Write-Output "=====================================================================================" | Out-File -FilePath $outfile -Append
         Write-Output "" | Out-File -FilePath $outfile -Append
 
         #call Get-Vulns with each file in the directory
         #if files other than sboms are in the directory, this could cause errors
         #that's why it's best not to have the output dir the same as the sbom dir
-        foreach ($file in $argtype.GetFiles()) {
+        foreach ($file in $argtype.GetFiles()) {           
             $SBOM = Get-Content -Path $file.fullname | ConvertFrom-Json
             $SBOMType = Get-SBOMType -SBOM $SBOM
             switch ($SBOMType) {
@@ -672,36 +860,37 @@ function SBOMResearcher {
                 "Unsupported" { Write-Output "This SBOM type is not supported" | Out-File -FilePath $outfile -Append }
             }
         }
-            if ($null -ne $allpurls) {
-                Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -minScore $minScore
-            }
 
-            $allVulns | ConvertTo-Json -Depth 5 | Out-Null
+        if ($null -ne $allpurls) {
+            Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -minScore $minScore
+        }
 
-            PrintVulnerabilities -allcomponents $allVulns -componentLocations $vulnLocations
+        $allVulns | ConvertTo-Json -Depth 5 | Out-Null
 
-        } else {
-            #file
-            $outfile = $wrkDir + "\" + $argtype.name.replace(".json","") + "_report.txt"
-            Write-Output "Vulnerabilities found for Project: $($argtype.name)" | Out-File -FilePath $outfile
-            Write-Output "=====================================================================================" | Out-File -FilePath $outfile -Append
-            Write-Output "" | Out-File -FilePath $outfile -Append
+        PrintVulnerabilities -allcomponents $allVulns -componentLocations $vulnLocations
+    
+    } else {
+        #file
+        $outfile = $wrkDir + "\" + $ProjectName + "_report.txt"
+        Write-Output "Vulnerabilities found for Project: $ProjectName" | Out-File -FilePath $outfile
+        Write-Output "=====================================================================================" | Out-File -FilePath $outfile -Append
+        Write-Output "" | Out-File -FilePath $outfile -Append
 
-            $SBOM = Get-Content -Path $SBOMPath | ConvertFrom-Json
-            $SBOMType = Get-SBOMType -SBOM $SBOM
-            $allpurls = @()
-            switch ($SBOMType) {
-                "CycloneDX" { $allpurls = Get-CycloneDXComponentList -SBOM $SBOM -allLicenses $allLicenses }
-                "SPDX" { $allpurls = Get-SPDXComponentList -SBOM $SBOM -allLicenses $allLicenses }
-                "Unsupported" { Write-Output "This SBOM type is not supported" | Out-File -FilePath $outfile -Append }
-            }
-            if ($null -ne $allpurls) {
-                Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -minScore $minScore
-            }
-            $allVulns | ConvertTo-Json -Depth 5 | Out-Null
+        $SBOM = Get-Content -Path $SBOMPath | ConvertFrom-Json
+        $SBOMType = Get-SBOMType -SBOM $SBOM
+        $allpurls = @()
+        switch ($SBOMType) {
+            "CycloneDX" { $allpurls = Get-CycloneDXComponentList -SBOM $SBOM -allLicenses $allLicenses }
+            "SPDX" { $allpurls = Get-SPDXComponentList -SBOM $SBOM -allLicenses $allLicenses }
+            "Unsupported" { Write-Output "This SBOM type is not supported" | Out-File -FilePath $outfile -Append }
+        }
+        if ($null -ne $allpurls) {
+            Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -minScore $minScore
+        }
+        $allVulns | ConvertTo-Json -Depth 5 | Out-Null
 
-            PrintVulnerabilities -allcomponents $allVulns -componentLocations $vulnLocations
+        PrintVulnerabilities -allcomponents $allVulns -componentLocations $vulnLocations
     }
 }
 
-#SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\smalltest" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true -minScore 7.0
+SBOMResearcher -ProjectName "SilentAurora" -SBOMPath "S:\Support\IT\Cybersecurity\SBOMs\SilentAurora" -wrkDir "C:\Temp\SBOMResearcher\SilentAurora\output" -PrintLicenseInfo $true -useIonChannel $true -minScore 7.0
