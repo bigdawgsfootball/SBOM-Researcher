@@ -46,14 +46,9 @@ The Optional -token parameter is only used when run in a CI/CD pipeline when que
 ## Best Practices enforcement
 SBOM-Researcher is evaluated against the default set of PSScriptAnalyzer
 rules. All rules are enforced. \
-Help documentation limited to the Usage section, comments in code, and the [How to use SBOMs at JWAC](https://urxjira.resource.jwac.mil:8444/download/attachments/70516958/How%20to%20deal%20with%20SBOMs%20at%20JWAC.docx?api=v2) document.\
+Help documentation limited to the Usage section, comments in code
 Important functions identified as Get-HighVersion, PrintLicenses and Convert-CVSSStringToBaseScore.
 Pester tests implemented against Get-HighVersion, PrintLicenses and Convert-CVSSStringToBaseScore functions.
-
-## Code Review
-This script produces results which direct compliance activities, and as such should be peer reviewed before use.
-
-Code reviewed by Pacey Long on 2023.11.01
 
 ## Project status
 Under active development
