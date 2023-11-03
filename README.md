@@ -17,15 +17,15 @@ you could upgrade to that will address all vulnerabilities.
 A rollup summary at the end of the report can indicate (if commandline option provided)
 an assessed action level of all open source licenses that were found.
 
-Also included in the output are JSON formated files showing all vulnerabilities found greater than the -minScore
+Also included in the output are JSON formaxted files showing all vulnerabilities found greater than the -minScore
 parameter, and another JSON file showing which SBOM files they were found in.
 
 Has been reasonably tested so far against CycloneDX formated SBOMs.
 This is the initial attempt for including SPDX formated SBOMs.
 Your SBOMPath may include a mix of CycloneDX and SPDX SBOMs.
 ## Usage
-SBOMResearcher -SBOMPath "_{Path to SBOM File or Directory}_" -wrkDir
-"_{Path to Directory for output files}_" [Optional]-ListAll boolean [Optional]-PrintLicenseInfo boolean [Optional]-useIonChannel boolean [Optional]-minScore boolean [Optional]-token string
+SBOMResearcher -ProjectName "_{ProjectName}_" -SBOMPath "_{Path to SBOM File or Directory}_" -wrkDir
+"_{Path to Directory for output files}_" [Optional] -ListAll boolean [Optional] -PrintLicenseInfo boolean [Optional] -minScore boolean
 
 It's best if the -wrkDir path is different from the -SBOMPath
 
