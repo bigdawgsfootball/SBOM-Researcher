@@ -25,11 +25,9 @@ This is the initial attempt for including SPDX formated SBOMs.
 Your SBOMPath may include a mix of CycloneDX and SPDX SBOMs.
 ## Usage
 SBOMResearcher -SBOMPath "_{Path to SBOM File or Directory}_" -wrkDir
-"_{Path to Directory for output files}_" [Optional]-ListAll boolean [Optional]-PrintLicenseInfo boolean [Optional]-useIonChannel boolean [Optional]-minScore boolean [Optional]-token string\
-\
-It's best if the -wrkDir path is different from the -SBOMPath \
-Currently fileshare.resource.jwac.mil\temp\SBOMResearch\ _{ProjectName}_ is
-a good place for -wrkDir
+"_{Path to Directory for output files}_" [Optional]-ListAll boolean [Optional]-PrintLicenseInfo boolean [Optional]-useIonChannel boolean [Optional]-minScore boolean [Optional]-token string
+
+It's best if the -wrkDir path is different from the -SBOMPath
 
 The Optional -ListAll parameter will print every purl evaluated into the
 output file, even if no vulnerabilities are found in it. If not included,
