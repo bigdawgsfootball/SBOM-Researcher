@@ -701,7 +701,7 @@ function SBOMResearcher {
         [Parameter(Mandatory=$true)][string]$wrkDir, #Directory where reports will be written, do NOT make it the same as $SBOMPath
         [Parameter(Mandatory=$true)][decimal]$minScore, #minimum score to include in report and output
         [Parameter(Mandatory=$false)][boolean]$ListAll=$false, #flag to write all components found in report, even if no vulnerabilities found
-        [Parameter(Mandatory=$false)][boolean]$PrintLicenseInfo=$false, #flag to print license info in report
+        [Parameter(Mandatory=$false)][boolean]$PrintLicenseInfo=$false #flag to print license info in report
     )
 
     #Begin main script
