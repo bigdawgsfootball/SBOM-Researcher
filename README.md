@@ -37,18 +37,18 @@ the default is to only print vulnerabilities found
 
 The Optional -PrintLicenseInfo parameter will include all licenses found in the SBOM organized by action categories. This should be included in SBOMs for code we have developed.
 
-The Optional -useIonChannel parameter will search Ion Channel as well as OSV. This is a licesensed tool that STRATCOM lets us use. If they run short on licenses, we may need to turn off.
-
 The Optional -minScore parameter will set the minimum CVSS score of Ion Channel vulnerabilities that will be returned in the report. Default is 7.0, the lowest High CVSS score.
 
-The Optional -token parameter is only used when run in a CI/CD pipeline when querying Ion Channel, and should contain the GitLab token for Vault.
 
 ## Best Practices enforcement
 SBOM-Researcher is evaluated against the default set of PSScriptAnalyzer
-rules. All rules are enforced. \
+rules. All rules are enforced.
+
 Help documentation limited to the Usage section, comments in code
+
 Important functions identified as Get-HighVersion, PrintLicenses and Convert-CVSSStringToBaseScore.
-Pester tests implemented against Get-HighVersion, PrintLicenses and Convert-CVSSStringToBaseScore functions.
+
+Pester tests implemented against Get-HighVersion, PrintLicenses, Convert-CVSSStringToBaseScore, Get-PurlName, Get-PurlVersion, Get-SBOMType, Get-SPDXComponents, Get-CyclondDXComponents, and Get-Version functions.
 
 ## Project status
 Under active development
