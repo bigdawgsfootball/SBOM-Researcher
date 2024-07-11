@@ -217,8 +217,6 @@ function PrintLicenses {
     $licenseFile = "$wrkDir\$($ProjectName)_license.json"
     $AllObj = @{ "Unmapped" = $UnmappedObj; "High" = $HighObj; "Medium" = $MedObj; "Low" = $LowObj } | ConvertTo-Json -Depth 2
     $AllObj | Out-File -FilePath $licensefile
-
-    
 }
 
 function PrintVulnerabilities {
@@ -558,14 +556,13 @@ function Get-SBOMType {
 
 function Get-CycloneDXComponentList {
     [CmdletBinding()]
-    [OutputType([string])]
+    [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
         [Parameter(Mandatory=$true)][PSObject]$allLicenses,
         [Parameter(Mandatory=$true)][ref]$componentLocations
     )
 
-    #$purlList = @()
     $purlList = [System.Collections.Generic.List[PSOBJECT]]::new()
 
     foreach ($package in $SBOM.components) {
@@ -601,7 +598,7 @@ function Get-CycloneDXComponentList {
                         "license" = "NOASSERTION"
                     }
                 }
-             
+
                 $purlList.Add($packageInfo)
                 $loc = [PSCustomObject]@{
                     "component" = Get-NameFromPurl -purl $package.purl;
@@ -640,14 +637,13 @@ function Get-CycloneDXComponentList {
 
 function Get-SPDXComponentList {
     [CmdletBinding()]
-    [OutputType([string])]
+    [OutputType([PSCustomObject[]])]
     param(
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
         [Parameter(Mandatory=$true)][PSObject]$allLicenses,
         [Parameter(Mandatory=$true)][ref]$componentLocations
     )
 
-    #$purlList = @()
     $purlList = [System.Collections.Generic.List[PSOBJECT]]::new()
 
     foreach ($package in $SBOM.packages) {
@@ -669,7 +665,7 @@ function Get-SPDXComponentList {
 
             if ($testVersion -ne "") {
                 $components = $testVersion.Split('.')
-                
+
                 if ($components.count -lt 3) {
                     $testversion += ".0"
                 }
@@ -727,7 +723,7 @@ function Get-SPDXComponentList {
                     }
                 }
                     $purlList.Add($packageInfo)
-                    
+
                     $loc = [PSCustomObject]@{
                         "component" = $testName;
                         "version" = $testVersion;
