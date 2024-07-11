@@ -556,7 +556,7 @@ function Get-SBOMType {
 
 function Get-CycloneDXComponentList {
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([PSObject[]])]
     param(
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
         [Parameter(Mandatory=$true)][PSObject]$allLicenses,
@@ -637,7 +637,7 @@ function Get-CycloneDXComponentList {
 
 function Get-SPDXComponentList {
     [CmdletBinding()]
-    [OutputType([PSCustomObject[]])]
+    [OutputType([PSObject[]])]
     param(
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
         [Parameter(Mandatory=$true)][PSObject]$allLicenses,
