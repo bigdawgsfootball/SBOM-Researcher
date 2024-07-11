@@ -56,9 +56,9 @@ Describe "PrintLicenses" {
 
         # Assert
         $content = Get-Content $outfile -Raw
-        $content | Should -Match "-   Low Risk Licenses found in this SBOM:  MIT   MIT"
-        $content | Should -Match "-   Medium Risk Licenses found in this SBOM:  MPL-2.0"
-        $content | Should -Match "-   High Risk Licenses found in this SBOM:"
+        $content | Should -Match "-   Low Action Licenses found in this SBOM:  MIT   MIT"
+        $content | Should -Match "-   Medium Action Licenses found in this SBOM:  MPL-2.0"
+        $content | Should -Match "-   High Action Licenses found in this SBOM:"
         $content | Should -Match "-   Unmapped Licenses found in this SBOM:"
     }
 
@@ -71,9 +71,9 @@ Describe "PrintLicenses" {
 
         # Assert
         $content = Get-Content $outfile -Raw
-        $content | Should -Match "-   Medium Risk Licenses found in this SBOM:  MPL-2.0   MPL-2.0"
-        $content | Should -Match "-   High Risk Licenses found in this SBOM:  GPL-3.0"
-        $content | Should -Match "-   Low Risk Licenses found in this SBOM:"
+        $content | Should -Match "-   Medium Action Licenses found in this SBOM:  MPL-2.0   MPL-2.0"
+        $content | Should -Match "-   High Action Licenses found in this SBOM:  GPL-3.0"
+        $content | Should -Match "-   Low Action Licenses found in this SBOM:"
         $content | Should -Match "-   Unmapped Licenses found in this SBOM:"
     }
 
@@ -86,10 +86,10 @@ Describe "PrintLicenses" {
 
         # Assert
         $content = Get-Content $outfile -Raw
-        $content | Should -Match "-   High Risk Licenses found in this SBOM:  GPL-3.0   GPL-3.0"
+        $content | Should -Match "-   High Action Licenses found in this SBOM:  GPL-3.0   GPL-3.0"
         $content | Should -Match "-   Unmapped Licenses found in this SBOM:  Unknown"
-        $content | Should -Match "-   Low Risk Licenses found in this SBOM:"
-        $content | Should -Match "-   Medium Risk Licenses found in this SBOM:"
+        $content | Should -Match "-   Low Action Licenses found in this SBOM:"
+        $content | Should -Match "-   Medium Action Licenses found in this SBOM:"
     }
 
     It "should print unmapped licenses correctly" {
@@ -102,9 +102,9 @@ Describe "PrintLicenses" {
         # Assert
         $content = Get-Content $outfile -Raw
         $content | Should -Match "-   Unmapped Licenses found in this SBOM:  Unknown   Unknown"
-        $content | Should -Match "-   Low Risk Licenses found in this SBOM:  MIT"
-        $content | Should -Match "-   Medium Risk Licenses found in this SBOM:"
-        $content | Should -Match "-   High Risk Licenses found in this SBOM:"
+        $content | Should -Match "-   Low Action Licenses found in this SBOM:  MIT"
+        $content | Should -Match "-   Medium Action Licenses found in this SBOM:"
+        $content | Should -Match "-   High Action Licenses found in this SBOM:"
     }
 
     It "should throw an error if no licenses are provided" {
