@@ -1,5 +1,6 @@
 # SBOM-Researcher
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/bigdawgsfootball/SBOM-Researcher/badge)](https://scorecard.dev/viewer/?uri=github.com/bigdawgsfootball/SBOM-Researcher)
 
 ## Description
 This script takes a path to an SBOM, or a directory of SBOMs, pulls out each
