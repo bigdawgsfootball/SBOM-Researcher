@@ -16,7 +16,7 @@ A rollup summary for each component in the report will indicate if there is a Ve
 
 A rollup summary at the end of the report can indicate (if commandline option provided) an assessed risk level of all open source licenses that were found.
 
-All of the above information will be contained in the _ProjectName__report.txt output file. 2 other files are created which contain json representations of the vulnerabilities found and a mapping to the SBOM files they were found in.
+All of the above information will be contained in the _ProjectName__report.txt output file. 2 other files are created which contain json representations of the vulnerabilities found and a mapping to the SBOM files they were found in. These were designed to be used in pipeline actions to support decision gates.
 
 Has been tested reasonably so far against CycloneDX formated SBOMs.
 This is the initial attempt for including SPDX formated SBOMs.
