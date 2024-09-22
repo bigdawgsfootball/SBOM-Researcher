@@ -1,10 +1,22 @@
-# Start the pester tests
 Describe "PrintLicenses" {
     BeforeAll {
         # Import the function from the script file
         . .\SBOMResearcher.ps1
     }
     
+    BeforeEach {
+        # Set up necessary variables
+        $global:outfile = "test_report.txt"
+        $global:wrkDir = "C:\Test"
+        $global:ProjectName = "TestProject"
+        New-Item -ItemType Directory -Path $wrkDir -Force | Out-Null
+    }
+
+    AfterEach {
+        # Clean up
+        Remove-Item -Path $wrkDir -Recurse -Force
+    }
+
     # Mocking Out-File to prevent actual file writing during tests
     Mock -CommandName Out-File
 
@@ -60,8 +72,6 @@ Describe "PrintLicenses" {
     }
     
     It "should throw an error if no licenses are provided" {
-
-       { PrintLicenses -alllicenses $alllicenses } | Should -Throw "Cannot bind argument to parameter 'alllicenses' because it is null."
-
+        { PrintLicenses -alllicenses $null } | Should -Throw "Cannot bind argument to parameter 'alllicenses' because it is null."
     }
 }
