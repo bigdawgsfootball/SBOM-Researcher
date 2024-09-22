@@ -1,3 +1,9 @@
+# Helper function to convert objects to JSON for comparison
+function ConvertTo-JsonString {
+    param ($obj)
+    return $obj | ConvertTo-Json -Compress
+}
+
 Describe "PrintLicenses" {
     BeforeAll {
         # Import the function from the script file
@@ -19,12 +25,6 @@ Describe "PrintLicenses" {
 
     # Mocking Out-File to prevent actual file writing during tests
     Mock -CommandName Out-File
-
-    # Helper function to convert objects to JSON for comparison
-    function ConvertTo-JsonString {
-        param ($obj)
-        return $obj | ConvertTo-Json -Compress
-    }
 
     # Test case for Low Action Licenses
     It "Should categorize Low Action Licenses correctly" {
