@@ -1,9 +1,3 @@
-# Helper function to convert objects to JSON for comparison
-function ConvertTo-JsonString {
-    param ($obj)
-    return $obj | ConvertTo-Json -Compress
-}
-
 Describe "PrintLicenses" {
     BeforeAll {
         # Import the function from the script file
@@ -28,6 +22,11 @@ Describe "PrintLicenses" {
 
     # Test case for Low Action Licenses
     It "Should categorize Low Action Licenses correctly" {
+        function ConvertTo-JsonString {
+            param ($obj)
+            return $obj | ConvertTo-Json -Compress
+        }
+
         $alllicenses = @("MIT", "Apache-2.0")
         . PrintLicenses -alllicenses $alllicenses
 
@@ -38,6 +37,11 @@ Describe "PrintLicenses" {
 
     # Test case for Medium Action Licenses
     It "Should categorize Medium Action Licenses correctly" {
+        function ConvertTo-JsonString {
+            param ($obj)
+            return $obj | ConvertTo-Json -Compress
+        }
+
         $alllicenses = @("MPL-2.0", "EPL-1.0")
         . PrintLicenses -alllicenses $alllicenses
 
@@ -48,6 +52,11 @@ Describe "PrintLicenses" {
 
     # Test case for High Action Licenses
     It "Should categorize High Action Licenses correctly" {
+        function ConvertTo-JsonString {
+            param ($obj)
+            return $obj | ConvertTo-Json -Compress
+        }
+
         $alllicenses = @("GPL-3.0", "AGPL-3.0")
         . PrintLicenses -alllicenses $alllicenses
 
@@ -58,6 +67,11 @@ Describe "PrintLicenses" {
 
     # Test case for Unmapped Licenses
     It "Should categorize Unmapped Licenses correctly" {
+        function ConvertTo-JsonString {
+            param ($obj)
+            return $obj | ConvertTo-Json -Compress
+        }
+
         $alllicenses = @("Unknown-License")
         . PrintLicenses -alllicenses $alllicenses
 
@@ -67,6 +81,11 @@ Describe "PrintLicenses" {
 
     # Test case for mixed licenses
     It "Should categorize mixed licenses correctly" {
+        function ConvertTo-JsonString {
+            param ($obj)
+            return $obj | ConvertTo-Json -Compress
+        }
+
         $alllicenses = @("MIT", "MPL-2.0", "GPL-3.0", "Unknown-License")
         . PrintLicenses -alllicenses $alllicenses
 
