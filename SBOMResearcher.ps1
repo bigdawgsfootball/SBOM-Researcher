@@ -296,7 +296,7 @@ function Test-PurlFormat {
         [string]$purl
     )
 
-    $purlRegex = '^pkg:[a-z]+/[a-zA-Z0-9_-]+@[0-9]+\.[0-9]+\.[0-9]+$'
+    $purlRegex = '^pkg:[a-z]+/[a-zA-Z0-9._-]+@[0-9]+\.[0-9]+\.[0-9]+$'
 
     if ($purl -match $purlRegex) {
         return $true

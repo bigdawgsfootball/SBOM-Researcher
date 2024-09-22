@@ -3,110 +3,62 @@ Describe "PrintLicenses" {
     BeforeAll {
         # Import the function from the script file
         . .\SBOMResearcher.ps1
+    }
+    
+    # Mocking Out-File to prevent actual file writing during tests
+    Mock -CommandName Out-File
 
-        # Define some mock licenses for testing
-        $mockLowRiskLicense = [PSCustomObject]@{
-            license = [PSCustomObject]@{
-                id = "MIT"
-            }
-        }
+    # Test case for Low Action Licenses
+    It "Should categorize Low Action Licenses correctly" {
+        $alllicenses = @("MIT", "Apache-2.0")
+        . PrintLicenses -alllicenses $alllicenses
 
-        $mockMedRiskLicense = [PSCustomObject]@{
-            license = [PSCustomObject]@{
-                id = "MPL-2.0"
-            }
-        }
-
-        $mockHighRiskLicense = [PSCustomObject]@{
-            license = [PSCustomObject]@{
-                id = "GPL-3.0"
-            }
-        }
-
-        $mockUnmappedLicense = [PSCustomObject]@{
-            license = [PSCustomObject]@{
-                id = "Unknown"
-            }
-        }
-
-        # Define the output file path
-        $outfile = ".\test.txt"
-        }
-
-    BeforeEach {
-        # Remove the output file if it exists
-        if ($outfile -and (Test-Path $outfile)) {
-            Remove-Item $outfile
-        }
+        # Verify the output
+        $LowObj | Should -Contain @{ License = "MIT"; Type = "LOW" }
+        $LowObj | Should -Contain @{ License = "Apache-2.0"; Type = "LOW" }
     }
 
-    AfterEach {
-        # Remove the output file if it exists
-        if ($outfile -and (Test-Path $outfile)) {
-            Remove-Item $outfile
-        }
+    # Test case for Medium Action Licenses
+    It "Should categorize Medium Action Licenses correctly" {
+        $alllicenses = @("MPL-2.0", "EPL-1.0")
+        . PrintLicenses -alllicenses $alllicenses
+
+        # Verify the output
+        $MedObj | Should -Contain @{ License = "MPL-2.0"; Type = "MEDIUM" }
+        $MedObj | Should -Contain @{ License = "EPL-1.0"; Type = "MEDIUM" }
     }
 
-    It "should print low risk licenses correctly" {
-        # Arrange
-        $alllicenses = @($mockLowRiskLicense, $mockLowRiskLicense, $mockMedRiskLicense)
+    # Test case for High Action Licenses
+    It "Should categorize High Action Licenses correctly" {
+        $alllicenses = @("GPL-3.0", "AGPL-3.0")
+        . PrintLicenses -alllicenses $alllicenses
 
-        # Act
-        PrintLicenses -alllicenses $alllicenses
-
-        # Assert
-        $content = Get-Content $outfile -Raw
-        $content | Should -Match "-   Low Action Licenses found in this SBOM:  MIT   MIT"
-        $content | Should -Match "-   Medium Action Licenses found in this SBOM:  MPL-2.0"
-        $content | Should -Match "-   High Action Licenses found in this SBOM:"
-        $content | Should -Match "-   Unmapped Licenses found in this SBOM:"
+        # Verify the output
+        $HighObj | Should -Contain @{ License = "GPL-3.0"; Type = "HIGH" }
+        $HighObj | Should -Contain @{ License = "AGPL-3.0"; Type = "HIGH" }
     }
 
-    It "should print medium risk licenses correctly" {
-        # Arrange
-        $alllicenses = @($mockMedRiskLicense, $mockMedRiskLicense, $mockHighRiskLicense)
+    # Test case for Unmapped Licenses
+    It "Should categorize Unmapped Licenses correctly" {
+        $alllicenses = @("Unknown-License")
+        . PrintLicenses -alllicenses $alllicenses
 
-        # Act
-        PrintLicenses -alllicenses $alllicenses
-
-        # Assert
-        $content = Get-Content $outfile -Raw
-        $content | Should -Match "-   Medium Action Licenses found in this SBOM:  MPL-2.0   MPL-2.0"
-        $content | Should -Match "-   High Action Licenses found in this SBOM:  GPL-3.0"
-        $content | Should -Match "-   Low Action Licenses found in this SBOM:"
-        $content | Should -Match "-   Unmapped Licenses found in this SBOM:"
+        # Verify the output
+        $UnmappedObj | Should -Contain @{ License = "Unknown-License"; Type = "UNMAPPED" }
     }
 
-    It "should print high risk licenses correctly" {
-        # Arrange
-        $alllicenses = @($mockHighRiskLicense, $mockHighRiskLicense, $mockUnmappedLicense)
+    # Test case for mixed licenses
+    It "Should categorize mixed licenses correctly" {
+        $alllicenses = @("MIT", "MPL-2.0", "GPL-3.0", "Unknown-License")
+        . PrintLicenses -alllicenses $alllicenses
 
-        # Act
-        PrintLicenses -alllicenses $alllicenses
-
-        # Assert
-        $content = Get-Content $outfile -Raw
-        $content | Should -Match "-   High Action Licenses found in this SBOM:  GPL-3.0   GPL-3.0"
-        $content | Should -Match "-   Unmapped Licenses found in this SBOM:  Unknown"
-        $content | Should -Match "-   Low Action Licenses found in this SBOM:"
-        $content | Should -Match "-   Medium Action Licenses found in this SBOM:"
+        # Verify the output
+        $LowObj | Should -Contain @{ License = "MIT"; Type = "LOW" }
+        $MedObj | Should -Contain @{ License = "MPL-2.0"; Type = "MEDIUM" }
+        $HighObj | Should -Contain @{ License = "GPL-3.0"; Type = "HIGH" }
+        $UnmappedObj | Should -Contain @{ License = "Unknown-License"; Type = "UNMAPPED" }
     }
-
-    It "should print unmapped licenses correctly" {
-        # Arrange
-        $alllicenses = @($mockUnmappedLicense, $mockUnmappedLicense, $mockLowRiskLicense)
-
-        # Act
-        PrintLicenses -alllicenses $alllicenses
-
-        # Assert
-        $content = Get-Content $outfile -Raw
-        $content | Should -Match "-   Unmapped Licenses found in this SBOM:  Unknown   Unknown"
-        $content | Should -Match "-   Low Action Licenses found in this SBOM:  MIT"
-        $content | Should -Match "-   Medium Action Licenses found in this SBOM:"
-        $content | Should -Match "-   High Action Licenses found in this SBOM:"
-    }
-
+    
     It "should throw an error if no licenses are provided" {
 
        { PrintLicenses -alllicenses $alllicenses } | Should -Throw "Cannot bind argument to parameter 'alllicenses' because it is null."
