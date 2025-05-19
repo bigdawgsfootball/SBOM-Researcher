@@ -296,13 +296,16 @@ function Test-PurlFormat {
         [string]$purl
     )
 
-    $purlRegex = '^pkg:[a-z]+/[a-zA-Z0-9._-]+@[0-9]+\.[0-9]+\.[0-9]+$'
-
-    if ($purl -match $purlRegex) {
+    #$purlRegex = '^pkg:[a-z]+/[a-zA-Z0-9._-]+@[0-9]+\.[0-9]+\.[0-9]+$'
+    $purlDecoded = [System.Web.HttpUtility]::UrlDecode($purl)
+    
+    $purlRegex = '^pkg:[a-Z0-9-]+/([a-zA-Z0-9._~-]+/?)+@([0-9]+\.(\*|[0-9]+)\.(\*|[0-9]+)([+-][a-zA-Z0-9._-]+)?)$'
+     
+    if ($purlDecoded -match $purlRegex) {
         return $true
     } else {
         return $false
-    }
+    }   
 }
 function Get-VersionFromPurl {
     [CmdletBinding()]
@@ -660,14 +663,18 @@ function Get-SPDXComponentList {
         if (($package.externalRefs.referenceLocator -ne "") -and ($null -ne $package.externalRefs.referenceLocator)) {
             $testVersion = Get-VersionFromPurl -purl $package.externalRefs.referenceLocator
             if ($testVersion -eq "") {
-                $testVersion = ($package.versioninfo).trimstart('^', '>', '<', '=', ' ')
+                #$testVersion = ($package.versioninfo).trimstart('^', '>', '<', '=', ' ')
+                $rangePattern = '(?<=\>|\>=)\d+(\.\d+){0,2}'
+                $testVersion = [regex]::Match(($package.versionInfo -replace " ",""), $rangePattern).Value
         }
 
             if ($testVersion -ne "") {
                 $components = $testVersion.Split('.')
 
-                if ($components.count -lt 3) {
+                #if ($components.count -lt 3) {
+                while ($components.count -lt 3) {
                     $testversion += ".0"
+                    $components = $testVersion.Split('.')
                 }
             }
 
