@@ -575,7 +575,7 @@ function Get-VulnList {
                             { ($_ -lt 4.0) } { $vuln.Severity = "LOW"; Break }
                             default { $vuln.Severity - "UNKNOWN"}
                         }
-                    elseif ($vulnerability.severity.score.contains("4.0")) {
+                    } elseif ($vulnerability.severity.score.contains("4.0")) {
                         #CVSS 4.0
                         $scoreuri = "https://www.first.org/cvss/calculator/4-0#"
                         $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
@@ -956,4 +956,4 @@ function SBOMResearcher {
     }
 }
 
-#SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\smalltest" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true -minScore 7.0
+SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\smalltest" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true -minScore 7.0
