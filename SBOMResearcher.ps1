@@ -402,7 +402,7 @@ function Test-PurlFormat {
     #$purlRegex = '^pkg:[a-z]+/[a-zA-Z0-9._-]+@[0-9]+\.[0-9]+\.[0-9]+$'
     $purlDecoded = [System.Web.HttpUtility]::UrlDecode($purl)
     
-    $purlRegex = '^pkg:[a-Z0-9-]+/([a-zA-Z0-9._~-]+/?)+@([0-9]+\.(\*|[0-9]+)\.(\*|[0-9]+)([+-][a-zA-Z0-9._-]+)?)$'
+    $purlRegex = '^pkg:[a-z0-9.+-]+/[a-zA-Z0-9._\-]+(/[a-zA-Z0-9._\-]+)*(@[^?\s]+)?(\?[^\s#]*)?(#[^\s]*)?$'
      
     if ($purlDecoded -match $purlRegex) {
         return $true
