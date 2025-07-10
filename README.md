@@ -22,6 +22,8 @@ Has been tested reasonably so far against CycloneDX formated SBOMs.
 This is the initial attempt for including SPDX formated SBOMs.
 Your SBOMPath may include a mix of CycloneDX and SPDX SBOMs.
 
+CVSS v3.0 and 3.1 are supported completely and validated against the FIRST.org calculator. CVSS 4.0 scores are incorporated and are being validated against the FIRST.org calculator.
+
 ## Usage
 SBOMResearcher -SBOMPath "_{Path to SBOM File or Directory}_" -wrkDir
 "_{Path to Directory for output files}_" [_Optional_]-ListAll true/false [_Optional_]-PrintLicenseInfo true/false -minScore decimal
