@@ -1,4 +1,4 @@
-function Convert-CVSSStringToBaseScore {
+function Convert-CVSS3StringToBaseScore {
     # This function takes a CVSS v3.1 string as input and returns the base score as output
     param (
         [Parameter(Mandatory=$true)]
@@ -91,6 +91,109 @@ function Convert-CVSSStringToBaseScore {
 
     # Return the base score as output
     return $BaseScoreFinal
+}
+
+function Convert-CVSS4StringToBaseScore {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$CVSSVector
+    )
+
+    # CVSS 4.0 metric weights (official, July 2024)
+    $metrics = @{
+        AV = @{ N = 0.85; A = 0.62; L = 0.55; P = 0.62 }
+        AC = @{ L = 0.77; H = 0.44 }
+        AT = @{ N = 0.85; P = 0.62 }
+        PR = @{ N = @{ U = 0.85; C = 0.85 }; L = @{ U = 0.62; C = 0.68 }; H = @{ U = 0.27; C = 0.50 } }
+        UI = @{ N = 0.85; A = 0.62; P = 0.85 }
+        VC = @{ H = 0.56; L = 0.22; N = 0.00 }
+        VI = @{ H = 0.56; L = 0.22; N = 0.00 }
+        VA = @{ H = 0.56; L = 0.22; N = 0.00 }
+        SC = @{ H = 1.00; L = 0.50; N = 0.00 }
+        SI = @{ H = 1.00; L = 0.50; N = 0.00 }
+        SA = @{ H = 1.00; L = 0.50; N = 0.00 }
+        # Temporal metrics (CVSS 4.0)
+        E  = @{ X = 1.00; U = 0.91; P = 0.75; F = 1.00; A = 1.00 }
+    }
+
+    # Environmental/Supplemental default values per CVSS 4.0 spec
+    $defaultMetrics = @{
+        CR = 'M'; IR = 'M'; AR = 'M';    # Requirements
+        MAV = 'X'; MAC = 'X'; MAT = 'X'; MPR = 'X'; MUI = 'X'; MVC = 'X'; MVI = 'X'; MVA = 'X'; MSC = 'X'; MSI = 'X'; MSA = 'X'
+        R = 'X'; V = 'X'; RE = 'X';      # Supplemental
+        U = 'X'                         # Utility
+    }
+
+    if ($CVSSVector -notmatch '^CVSS:4\.0/') {
+        throw "Vector does not start with 'CVSS:4.0/'"
+    }
+    $vector = $CVSSVector -replace '^CVSS:4\.0/', ''
+    $parts = @{}
+    foreach ($part in $vector.Split('/')) {
+        if ($part -match '^([A-Z]{1,3}):([A-Z]{1,2})$') {
+            $parts[$Matches[1]] = $Matches[2]
+        }
+    }
+
+    # Apply defaults for Environmental/Supplemental metrics if missing
+    foreach ($metric in $defaultMetrics.Keys) {
+        if (-not $parts.ContainsKey($metric)) {
+            $parts[$metric] = $defaultMetrics[$metric]
+        }
+    }
+
+    # Temporal: Exploit Maturity (E), default to 'A' (High) per CVSS 4.0 spec
+    if (-not $parts.ContainsKey('E')) {
+        $parts['E'] = 'A'
+    }
+
+    $required = @('AV','AC','AT','PR','UI','VC','VI','VA','SC','SI','SA')
+    foreach ($r in $required) {
+        if (-not $parts.ContainsKey($r)) {
+            throw "Required metric '$r' missing in vector."
+        }
+    }
+
+    # Scope: Used for PR calculation (U = Unchanged, C = Changed)
+    $scopeChanged = $parts['SC'] -eq 'H' ? 'C' : 'U'
+
+    $AV = $metrics['AV'][$parts['AV']]
+    $AC = $metrics['AC'][$parts['AC']]
+    $AT = $metrics['AT'][$parts['AT']]
+    $PR = $metrics['PR'][$parts['PR']][$scopeChanged]
+    $UI = $metrics['UI'][$parts['UI']]
+    $exploitability = 8.22 * $AV * $AC * $AT * $PR * $UI
+
+    $VC = $metrics['VC'][$parts['VC']]
+    $VI = $metrics['VI'][$parts['VI']]
+    $VA = $metrics['VA'][$parts['VA']]
+    $ISCBase_vuln = 1 - ((1 - $VC) * (1 - $VI) * (1 - $VA))
+
+    $SC = $metrics['SC'][$parts['SC']]
+    $SI = $metrics['SI'][$parts['SI']]
+    $SA = $metrics['SA'][$parts['SA']]
+    $ISCBase_subseq = 1 - ((1 - $SC) * (1 - $SI) * (1 - $SA))
+
+    $ISCBase = [Math]::Max($ISCBase_vuln, $ISCBase_subseq)
+
+    if ($ISCBase -ge 0.915) {
+        $Impact = 7.52 * ($ISCBase - 0.029) - 3.25 * [Math]::Pow(($ISCBase - 0.02), 15)
+    } else {
+        $Impact = 6.42 * $ISCBase
+    }
+
+    if ($Impact -le 0) {
+        $BaseScore = 0
+    } else {
+        $BaseScore = [Math]::Ceiling([Math]::Min($Impact + $exploitability, 10) * 10) / 10
+    }
+
+    # Temporal Score: round to nearest 0.1, not up
+    $E = $metrics['E'][$parts['E']]
+    $TemporalScore = [Math]::Round(($BaseScore * $E), 1, [MidpointRounding]::AwayFromZero)
+
+    return $TemporalScore
 }
 
 function ConvertTo-Version {
@@ -307,6 +410,7 @@ function Test-PurlFormat {
         return $false
     }   
 }
+
 function Get-VersionFromPurl {
     [CmdletBinding()]
     [OutputType([string])]
@@ -343,6 +447,7 @@ function Get-NameFromPurl {
         return ""
     }
 }
+
 function Get-VulnList {
     [CmdletBinding()]
     param(
@@ -436,10 +541,10 @@ function Get-VulnList {
 
                     if ($vulnerability.severity.score.contains("3.0")) {
                         #CVSS 3.0
-                        $scoreuri = "https://www.first.org/cvss/calculator/3.0#"
+                        $scoreuri = "https://www.first.org/cvss/calculator/3-0#"
                         $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
                         try {
-                            $vuln.Score = Convert-CVSSStringToBaseScore $vulnerability.severity.score
+                            $vuln.Score = Convert-CVSS3StringToBaseScore $vulnerability.severity.score
                         } catch {
                             Write-Output "$_ for $vulnerability" | Out-File -FilePath $outfile -Append
                         }
@@ -454,10 +559,10 @@ function Get-VulnList {
                         }
                     } elseif ($vulnerability.severity.score.contains("3.1")) {
                         #CVSS 3.1
-                        $scoreuri = "https://www.first.org/cvss/calculator/3.1#"
+                        $scoreuri = "https://www.first.org/cvss/calculator/3-1#"
                         $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
                         try {
-                            $vuln.Score = Convert-CVSSStringToBaseScore $vulnerability.severity.score
+                            $vuln.Score = Convert-CVSS3StringToBaseScore $vulnerability.severity.score
                         } catch {
                             Write-Output "$_ for $vulnerability" | Out-File -FilePath $outfile -Append
                         }
@@ -470,7 +575,24 @@ function Get-VulnList {
                             { ($_ -lt 4.0) } { $vuln.Severity = "LOW"; Break }
                             default { $vuln.Severity - "UNKNOWN"}
                         }
+                    elseif ($vulnerability.severity.score.contains("4.0")) {
+                        #CVSS 4.0
+                        $scoreuri = "https://www.first.org/cvss/calculator/4-0#"
+                        $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
+                        try {
+                            $vuln.Score = Convert-CVSS4StringToBaseScore $vulnerability.severity.score
+                        } catch {
+                            Write-Output "$_ for $vulnerability" | Out-File -FilePath $outfile -Append
+                        }
 
+                        switch ($vuln.Score)
+                        {
+                            { $_ -ge 9.0 }  { $vuln.Severity = "CRITICAL"; Break }
+                            { ($_ -ge 7.0) -and ($_ -lt 9.0) } { $vuln.Severity = "HIGH"; Break }
+                            { ($_ -ge 4.0) -and ($_ -lt 7.0) } { $vuln.Severity = "MEDIUM"; Break }
+                            { ($_ -lt 4.0) } { $vuln.Severity = "LOW"; Break }
+                            default { $vuln.Severity - "UNKNOWN"}
+                        }
                     } else {
                         #if this string shows up in any output file, need to build a new section for the new score version
                         $vuln.ScoreURI = "UPDATE CODE FOR THIS CVSS SCORE TYPE -> $vulnerability.severity.score"
