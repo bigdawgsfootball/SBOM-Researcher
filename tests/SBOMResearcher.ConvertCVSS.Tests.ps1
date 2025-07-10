@@ -1,4 +1,4 @@
-Describe "Convert-CVSSStringToBaseScore" {
+Describe "Convert-CVSS3StringToBaseScore" {
     BeforeAll {
         # Import the module that contains the function to test
         . .\SBOMResearcher.ps1
@@ -10,7 +10,7 @@ Describe "Convert-CVSSStringToBaseScore" {
         $expectedBaseScore = 9.8
 
         # Act
-        $actualBaseScore = Convert-CVSSStringToBaseScore -CVSSString $CVSSString
+        $actualBaseScore = Convert-CVSS3StringToBaseScore -CVSSString $CVSSString
 
         # Assert
         $actualBaseScore | Should -Be $expectedBaseScore
@@ -22,7 +22,7 @@ Describe "Convert-CVSSStringToBaseScore" {
         $expectedBaseScore = 7.4
 
         # Act
-        $actualBaseScore = Convert-CVSSStringToBaseScore -CVSSString $CVSSString
+        $actualBaseScore = Convert-CVSS3StringToBaseScore -CVSSString $CVSSString
 
         # Assert
         $actualBaseScore | Should -Be $expectedBaseScore
@@ -34,7 +34,7 @@ Describe "Convert-CVSSStringToBaseScore" {
         $expectedBaseScore = 5.3
 
         # Act
-        $actualBaseScore = Convert-CVSSStringToBaseScore -CVSSString $CVSSString
+        $actualBaseScore = Convert-CVSS3StringToBaseScore -CVSSString $CVSSString
 
         # Assert
         $actualBaseScore | Should -Be $expectedBaseScore
@@ -46,7 +46,7 @@ Describe "Convert-CVSSStringToBaseScore" {
         $expectedBaseScore = 2.3
 
         # Act
-        $actualBaseScore = Convert-CVSSStringToBaseScore -CVSSString $CVSSString
+        $actualBaseScore = Convert-CVSS3StringToBaseScore -CVSSString $CVSSString
 
         # Assert
         $actualBaseScore | Should -Be $expectedBaseScore
@@ -57,7 +57,7 @@ Describe "Convert-CVSSStringToBaseScore" {
         $CVSSString = "CVSS:3.1/AV:X/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H" # Invalid CVSS string
 
         # Act
-        $scriptBlock = { Convert-CVSSStringToBaseScore -CVSSString $CVSSString }
+        $scriptBlock = { Convert-CVSS3StringToBaseScore -CVSSString $CVSSString }
 
         # Assert
         $scriptBlock | Should -Throw -ExpectedMessage "Invalid CVSS v3.x string format"
