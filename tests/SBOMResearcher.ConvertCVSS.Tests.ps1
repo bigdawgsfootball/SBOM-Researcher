@@ -74,7 +74,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $expectedBaseScore = 9.3
 
         # Act
-        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
 
         # Assert
         $actualBaseScore | Should -Be $expectedBaseScore
@@ -86,7 +86,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $expectedBaseScore = 8.8
 
         # Act
-        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
 
         # Assert
         $actualBaseScore | Should -Be $expectedBaseScore
@@ -98,7 +98,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $expectedBaseScore = 5.3
 
         # Act
-        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
 
         # Assert
         $actualBaseScore | Should -Be $expectedBaseScore
@@ -110,7 +110,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $expectedBaseScore = 2.4
 
         # Act
-        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
 
         # Assert
         $actualBaseScore | Should -Be $expectedBaseScore
@@ -121,7 +121,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $CVSSString = "CVSS:4.0/AV:X/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N" # Invalid CVSS string
 
         # Act
-        $scriptBlock = { Convert-CVSS4StringToBaseScore -CVSSString $CVSSString }
+        $scriptBlock = { Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString }
 
         # Assert
         $scriptBlock | Should -Throw -ExpectedMessage "Invalid CVSS v4.0 string format"
