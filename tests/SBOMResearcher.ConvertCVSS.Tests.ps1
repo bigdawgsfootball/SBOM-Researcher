@@ -116,6 +116,19 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $actualBaseScore | Should -Be $expectedBaseScore
     }
 
+    It "returns the correct base score for additional examples" -TestCases @(
+        @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"; ExpectedBaseScore = 10.0 }
+        @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:L/SI:L/SA:L"; ExpectedBaseScore = 6.9 }
+        @{ CVSSString = "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:P/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"; ExpectedBaseScore = 8.5 }
+        @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:A/VC:N/VI:N/VA:N/SC:L/SI:L/SA:N"; ExpectedBaseScore = 5.1 }
+        @{ CVSSString = "CVSS:4.0/AV:P/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"; ExpectedBaseScore = 7.0 }
+        @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N"; ExpectedBaseScore = 0.0 }
+        @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N"; ExpectedBaseScore = 7.1 }
+    ) {
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
+        $actualBaseScore | Should -Be $ExpectedBaseScore
+    }
+
     It "throws an error for an invalid CVSS v4.0 string" {
         # Arrange
         $CVSSString = "CVSS:4.0/AV:X/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N" # Invalid CVSS string
