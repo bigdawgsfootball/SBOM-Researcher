@@ -42,7 +42,7 @@ rules. All rules are enforced.
 
 Help documentation limited to the Usage section and comments in code.
 
-Pester tests implemented against Convert-CVSSStringToBaseScore, Get-HighVersion and PrintLicenses functions.
+Pester tests implemented against Convert-CVSS3StringToBaseScore, Convert-CVSS4StringToBaseScore, Get-HighVersion and PrintLicenses functions.
 
 ## Project status
 Under active development

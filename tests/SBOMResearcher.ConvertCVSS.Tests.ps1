@@ -1,8 +1,8 @@
-Describe "Convert-CVSS3StringToBaseScore" {
     BeforeAll {
         # Import the module that contains the function to test
         . .\SBOMResearcher.ps1
     }
+    Describe "Convert-CVSS3StringToBaseScore" {
 
     It "returns the correct base score for a CRITICAL severity CVSS v3.1 string" {
         # Arrange
@@ -61,6 +61,70 @@ Describe "Convert-CVSS3StringToBaseScore" {
 
         # Assert
         $scriptBlock | Should -Throw -ExpectedMessage "Invalid CVSS v3.x string format"
+    }
+
+}
+
+
+Describe "Convert-CVSS4StringToBaseScore" {
+
+    It "returns the correct base score for a CRITICAL severity CVSS v4.0 string" {
+        # Arrange
+        $CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"
+        $expectedBaseScore = 9.3
+
+        # Act
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
+
+        # Assert
+        $actualBaseScore | Should -Be $expectedBaseScore
+    }
+
+    It "returns the correct base score for a HIGH severity CVSS v4.0 string" {
+        # Arrange
+        $CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:L/VA:N/SC:L/SI:L/SA:N"
+        $expectedBaseScore = 8.8
+
+        # Act
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
+
+        # Assert
+        $actualBaseScore | Should -Be $expectedBaseScore
+    }
+
+    It "returns the correct base score for a MEDIUM severity CVSS v4.0 string" {
+        # Arrange
+        $CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:L/VI:L/VA:N/SC:L/SI:L/SA:N"
+        $expectedBaseScore = 5.3
+
+        # Act
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
+
+        # Assert
+        $actualBaseScore | Should -Be $expectedBaseScore
+    }
+
+    It "returns the correct base score for a LOW severity CVSS v4.0 string" {
+        # Arrange
+        $CVSSString = "CVSS:4.0/AV:L/AC:H/AT:P/PR:L/UI:P/VC:L/VI:L/VA:L/SC:H/SI:H/SA:H"
+        $expectedBaseScore = 2.4
+
+        # Act
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
+
+        # Assert
+        $actualBaseScore | Should -Be $expectedBaseScore
+    }
+
+    It "throws an error for an invalid CVSS v4.0 string" {
+        # Arrange
+        $CVSSString = "CVSS:4.0/AV:X/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N" # Invalid CVSS string
+
+        # Act
+        $scriptBlock = { Convert-CVSS4StringToBaseScore -CVSSString $CVSSString }
+
+        # Assert
+        $scriptBlock | Should -Throw -ExpectedMessage "Invalid CVSS v4.0 string format"
     }
 
 }
