@@ -201,7 +201,7 @@ function Convert-CVSS4StringToBaseScore {
     if ($Impact -le 0) {
         $BaseScore = 0
     } else {
-        $BaseScore = [Math]::Round([Math]::Min($Impact + $exploitability, 10), 1, [MidpointRounding]::ToEven)
+        $BaseScore = [Math]::Round([Math]::Min($Impact + $exploitability, 10), 1, [MidpointRounding]::ToZero)
     }
 
     return $BaseScore
