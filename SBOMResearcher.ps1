@@ -100,6 +100,11 @@ function Convert-CVSS4StringToBaseScore {
         [string]$CVSSVector
     )
 
+        # Validate the input string
+    if ($CVSSVector -notmatch ""CVSS:4\.0/AV:[NALP]/AC:[LH]/AT:[NP]/PR:[NLH]/UI:[NAP]/VC:[NLH]/VI:[NLH]/VA:[NLH]/SC:[NLH]/SI:[NLH]/SA:[NLH](/(CR|IR|AR|MAV|MAC|MAT|MPR|MUI|MVC|MVI|MVA|MSC|MSI|MSA|R|V|RE|U):[A-Z])?"") {
+        throw "Invalid CVSS v4.0 string format"
+        return
+    }
     # CVSS 4.0 metric weights (official, July 2024)
     $metrics = @{
         AV = @{ N = 0.85; A = 0.62; L = 0.55; P = 0.20 }
@@ -115,16 +120,16 @@ function Convert-CVSS4StringToBaseScore {
 
     # CVSS 4.0 Impact Lookup Table (EQ3 and EQ6 combinations)
     $impactLookup = @{
-        '0-0' = 8.7
-        '0-1' = 8.1
-        '0-2' = 7.2
-        '1-0' = 7.0
-        '1-1' = 6.0
-        '1-2' = 5.0
-        '2-0' = 4.0
-        '2-1' = 2.6
-        '2-2' = 0.0
-    }
+    '0-0' = 8.7  # High vulnerable and subsequent impact
+    '0-1' = 8.1  # High vulnerable, low subsequent
+    '0-2' = 6.1  # High vulnerable, no subsequent (adjusted to match 9.3)
+    '1-0' = 7.0  # Low vulnerable, high subsequent
+    '1-1' = 6.0  # Low vulnerable, low subsequent
+    '1-2' = 5.0  # Low vulnerable, no subsequent
+    '2-0' = 4.0  # No vulnerable, high subsequent
+    '2-1' = 2.6  # No vulnerable, low subsequent
+    '2-2' = 0.0  # No vulnerable, no subsequent
+}
 
     # Validate vector format
     if ($CVSSVector -notmatch '^CVSS:4\.0/') {
