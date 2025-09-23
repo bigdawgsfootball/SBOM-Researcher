@@ -101,10 +101,11 @@ function Convert-CVSS4StringToBaseScore {
     )
 
         # Validate the input string
-    if ($CVSSVector -notmatch ""CVSS:4\.0/AV:[NALP]/AC:[LH]/AT:[NP]/PR:[NLH]/UI:[NAP]/VC:[NLH]/VI:[NLH]/VA:[NLH]/SC:[NLH]/SI:[NLH]/SA:[NLH](/(CR|IR|AR|MAV|MAC|MAT|MPR|MUI|MVC|MVI|MVA|MSC|MSI|MSA|R|V|RE|U):[A-Z])?"") {
+    if ($CVSSVector -notmatch "CVSS:4\.0/AV:[NALP]/AC:[LH]/AT:[NP]/PR:[NLH]/UI:[NAP]/VC:[NLH]/VI:[NLH]/VA:[NLH]/SC:[NLH]/SI:[NLH]/SA:[NLH](/(CR|IR|AR|MAV|MAC|MAT|MPR|MUI|MVC|MVI|MVA|MSC|MSI|MSA|R|V|RE|U):[A-Z])?") {
         throw "Invalid CVSS v4.0 string format"
         return
     }
+
     # CVSS 4.0 metric weights (official, July 2024)
     $metrics = @{
         AV = @{ N = 0.85; A = 0.62; L = 0.55; P = 0.20 }
