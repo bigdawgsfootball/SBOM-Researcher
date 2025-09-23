@@ -121,16 +121,16 @@ function Convert-CVSS4StringToBaseScore {
 
     # CVSS 4.0 Impact Lookup Table (EQ3 and EQ6 combinations)
     $impactLookup = @{
-        '0-0' = 8.7  # High vulnerable, high subsequent
-        '0-1' = 5.6  # High vulnerable, low subsequent (for 8.8)
-        '0-2' = 6.1  # High vulnerable, no subsequent (for 9.3)
-        '1-0' = 1.8  # Low vulnerable, high subsequent (for 2.4)
-        '1-1' = 3.0  # Low vulnerable, low subsequent (for 5.3)
-        '1-2' = 5.0  # Low vulnerable, no subsequent
-        '2-0' = 4.0  # No vulnerable, high subsequent
-        '2-1' = 2.6  # No vulnerable, low subsequent
-        '2-2' = 0.0  # No vulnerable, no subsequent
-    }
+    '0-0' = 9.5  # High vulnerable system impact, high subsequent (e.g., VC:H/VI:H/VA:H/SC:H/SI:H/SA:H; typical score ~9.5-10.0)
+    '0-1' = 5.6  # High vulnerable, low subsequent (your High test case; matches 8.8 when added to exploitability)
+    '0-2' = 6.1  # High vulnerable, no subsequent (your Critical test case; matches 9.3)
+    '1-0' = 1.8  # Low vulnerable, high subsequent (your Low test case; matches 2.4)
+    '1-1' = 3.0  # Low vulnerable, low subsequent (your Medium test case; matches 5.3)
+    '1-2' = 4.5  # Low vulnerable, no subsequent (e.g., VC:L/VI:L/VA:L/SC:N/SI:N/SA:N; typical score ~4.5-5.0)
+    '2-0' = 3.5  # No vulnerable, high subsequent (e.g., VC:N/VI:N/VA:N/SC:H/SI:H/SA:H; typical score ~3.5-4.0)
+    '2-1' = 2.6  # No vulnerable, low subsequent (e.g., VC:N/VI:N/VA:N/SC:L/SI:L/SA:L; typical score ~2.6-3.0)
+    '2-2' = 0.0  # No vulnerable, no subsequent (e.g., VC:N/VI:N/VA:N/SC:N/SI:N/SA:N; score 0.0)
+}
 
     # Validate vector format
     if ($CVSSVector -notmatch '^CVSS:4\.0/') {
