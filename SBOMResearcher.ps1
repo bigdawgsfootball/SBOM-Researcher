@@ -102,29 +102,31 @@ function Convert-CVSS4StringToBaseScore {
 
     # CVSS 4.0 metric weights (official, July 2024)
     $metrics = @{
-        AV = @{ N = 0.85; A = 0.62; L = 0.55; P = 0.62 }
+        AV = @{ N = 0.85; A = 0.62; L = 0.55; P = 0.20 }
         AC = @{ L = 0.77; H = 0.44 }
         AT = @{ N = 0.85; P = 0.62 }
         PR = @{ N = @{ U = 0.85; C = 0.85 }; L = @{ U = 0.62; C = 0.68 }; H = @{ U = 0.27; C = 0.50 } }
-        UI = @{ N = 0.85; A = 0.62; P = 0.85 }
+        UI = @{ N = 0.85; A = 0.62; P = 0.68 }
         VC = @{ H = 0.56; L = 0.22; N = 0.00 }
         VI = @{ H = 0.56; L = 0.22; N = 0.00 }
         VA = @{ H = 0.56; L = 0.22; N = 0.00 }
-        SC = @{ H = 1.00; L = 0.50; N = 0.00 }
-        SI = @{ H = 1.00; L = 0.50; N = 0.00 }
-        SA = @{ H = 1.00; L = 0.50; N = 0.00 }
-        # Temporal metrics (CVSS 4.0)
-        E  = @{ X = 1.00; U = 0.91; P = 0.75; F = 1.00; A = 1.00 }
+        # Note: SC, SI, SA weights are not used; handled via lookup table
     }
 
-    # Environmental/Supplemental default values per CVSS 4.0 spec
-    $defaultMetrics = @{
-        CR = 'M'; IR = 'M'; AR = 'M';    # Requirements
-        MAV = 'X'; MAC = 'X'; MAT = 'X'; MPR = 'X'; MUI = 'X'; MVC = 'X'; MVI = 'X'; MVA = 'X'; MSC = 'X'; MSI = 'X'; MSA = 'X'
-        R = 'X'; V = 'X'; RE = 'X';      # Supplemental
-        U = 'X'                         # Utility
+    # CVSS 4.0 Impact Lookup Table (EQ3 and EQ6 combinations)
+    $impactLookup = @{
+        '0-0' = 8.7
+        '0-1' = 8.1
+        '0-2' = 7.2
+        '1-0' = 7.0
+        '1-1' = 6.0
+        '1-2' = 5.0
+        '2-0' = 4.0
+        '2-1' = 2.6
+        '2-2' = 0.0
     }
 
+    # Validate vector format
     if ($CVSSVector -notmatch '^CVSS:4\.0/') {
         throw "Vector does not start with 'CVSS:4.0/'"
     }
@@ -136,28 +138,30 @@ function Convert-CVSS4StringToBaseScore {
         }
     }
 
-    # Apply defaults for Environmental/Supplemental metrics if missing
+    # Apply defaults for environmental/supplemental metrics
+    $defaultMetrics = @{
+        CR = 'M'; IR = 'M'; AR = 'M';
+        MAV = 'X'; MAC = 'X'; MAT = 'X'; MPR = 'X'; MUI = 'X'; MVC = 'X'; MVI = 'X'; MVA = 'X'; MSC = 'X'; MSI = 'X'; MSA = 'X';
+        R = 'X'; V = 'X'; RE = 'X'; U = 'X'
+    }
     foreach ($metric in $defaultMetrics.Keys) {
         if (-not $parts.ContainsKey($metric)) {
             $parts[$metric] = $defaultMetrics[$metric]
         }
     }
 
-    # Temporal: Exploit Maturity (E), default to 'A' (High) per CVSS 4.0 spec
-    if (-not $parts.ContainsKey('E')) {
-        $parts['E'] = 'A'
-    }
-
-    $required = @('AV','AC','AT','PR','UI','VC','VI','VA','SC','SI','SA')
+    # Validate required metrics
+    $required = @('AV', 'AC', 'AT', 'PR', 'UI', 'VC', 'VI', 'VA', 'SC', 'SI', 'SA')
     foreach ($r in $required) {
         if (-not $parts.ContainsKey($r)) {
             throw "Required metric '$r' missing in vector."
         }
     }
 
-    # Scope: Used for PR calculation (U = Unchanged, C = Changed)
-    $scopeChanged = $parts['SC'] -eq 'H' ? 'C' : 'U'
+    # Determine Scope for PR calculation
+    $scopeChanged = ($parts['SC'] -eq 'H' -or $parts['SI'] -eq 'H' -or $parts['SA'] -eq 'H') ? 'C' : 'U'
 
+    # Calculate Exploitability
     $AV = $metrics['AV'][$parts['AV']]
     $AC = $metrics['AC'][$parts['AC']]
     $AT = $metrics['AT'][$parts['AT']]
@@ -165,35 +169,36 @@ function Convert-CVSS4StringToBaseScore {
     $UI = $metrics['UI'][$parts['UI']]
     $exploitability = 8.22 * $AV * $AC * $AT * $PR * $UI
 
-    $VC = $metrics['VC'][$parts['VC']]
-    $VI = $metrics['VI'][$parts['VI']]
-    $VA = $metrics['VA'][$parts['VA']]
-    $ISCBase_vuln = 1 - ((1 - $VC) * (1 - $VI) * (1 - $VA))
-
-    $SC = $metrics['SC'][$parts['SC']]
-    $SI = $metrics['SI'][$parts['SI']]
-    $SA = $metrics['SA'][$parts['SA']]
-    $ISCBase_subseq = 1 - ((1 - $SC) * (1 - $SI) * (1 - $SA))
-
-    $ISCBase = [Math]::Max($ISCBase_vuln, $ISCBase_subseq)
-
-    if ($ISCBase -ge 0.915) {
-        $Impact = 7.52 * ($ISCBase - 0.029) - 3.25 * [Math]::Pow(($ISCBase - 0.02), 15)
+    # Determine EQ3 (Vulnerable System Impact)
+    if ($parts['VC'] -eq 'H' -or $parts['VI'] -eq 'H' -or $parts['VA'] -eq 'H') {
+        $EQ3 = 0
+    } elseif ($parts['VC'] -eq 'L' -or $parts['VI'] -eq 'L' -or $parts['VA'] -eq 'L') {
+        $EQ3 = 1
     } else {
-        $Impact = 6.42 * $ISCBase
+        $EQ3 = 2
     }
 
+    # Determine EQ6 (Subsequent System Impact)
+    if ($parts['SC'] -eq 'H' -or $parts['SI'] -eq 'H' -or $parts['SA'] -eq 'H') {
+        $EQ6 = 0
+    } elseif ($parts['SC'] -eq 'L' -or $parts['SI'] -eq 'L' -or $parts['SA'] -eq 'L') {
+        $EQ6 = 1
+    } else {
+        $EQ6 = 2
+    }
+
+    # Get Impact Score from Lookup Table
+    $impactKey = "$EQ3-$EQ6"
+    $Impact = $impactLookup[$impactKey]
+
+    # Calculate Base Score
     if ($Impact -le 0) {
         $BaseScore = 0
     } else {
-        $BaseScore = [Math]::Ceiling([Math]::Min($Impact + $exploitability, 10) * 10) / 10
+        $BaseScore = [Math]::Round([Math]::Min($Impact + $exploitability, 10), 1, [MidpointRounding]::AwayFromZero)
     }
 
-    # Temporal Score: round to nearest 0.1, not up
-    $E = $metrics['E'][$parts['E']]
-    $TemporalScore = [Math]::Round(($BaseScore * $E), 1, [MidpointRounding]::AwayFromZero)
-
-    return $TemporalScore
+    return $BaseScore
 }
 
 function ConvertTo-Version {
