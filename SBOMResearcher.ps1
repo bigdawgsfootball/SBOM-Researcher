@@ -479,9 +479,10 @@ function Get-VulnList {
         }
 
         # Build the JSON body for the OSV API query
+        # noticed that OSV.dev records cargo package type as crates.io, need to handle that here on query
         $body = @{
             "package" = @{
-                "purl" = $purl.purl
+                "purl" = $purl.purl.Replace("pkg:cargo/","pkg:crates.io/")
             }
         } | ConvertTo-Json
 
@@ -806,11 +807,14 @@ function Get-SPDXComponentList {
 
             $testName = Get-NameFromPurl -purl $package.externalRefs.referenceLocator
             if ($testName -eq "") {
-                $testName = ($package.name).Replace(':','/')
+                <#$testName = ($package.name).Replace(':','/')
                 $purlString = "pkg:" + $testName + "@" + $testVersion
                 $parts = $testname.split('/')
                 if ($parts.count -gt 1) {
-                    $testName = $parts[1]
+                    $testName = $parts[1]#>
+                #encountered some differences in the SPDX purl formats, need to handle those here
+                $testName = $package.externalRefs.referenceLocator
+                $purlString = $testName + "@" + $testVersion
         } else {
                     $testName = $parts[0]
                 }
