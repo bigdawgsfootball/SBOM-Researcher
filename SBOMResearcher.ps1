@@ -813,11 +813,11 @@ function Get-SPDXComponentList {
                 if ($parts.count -gt 1) {
                     $testName = $parts[1]
                 } else {
-                    $testName = $parts[0]#>
-                    #encountered some differences in the SPDX purl formats, need to handle those here
+                    $testName = $parts[0]
+                }#>
+                #encountered some differences in the SPDX purl formats, need to handle those here
                 $testName = $package.externalRefs.referenceLocator
                 $purlString = $testName + "@" + $testVersion
-                }
             } else {
                 if (Test-PurlFormat($package.externalRefs.referenceLocator)) {
                     $purlString = ($package.externalRefs.referenceLocator) #.split("@")[0]
