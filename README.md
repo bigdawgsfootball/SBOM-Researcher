@@ -4,6 +4,9 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9346/badge)](https://www.bestpractices.dev/projects/9346)
 
 ## Description
+
+***Update** CVSS 4.0 scoring is validated and fully functional.*
+
 This script takes a path to an SBOM, or a directory of SBOMs, pulls out each
 package referenced, and queries the OSV (Open Source Vulnerability) DB
 managed by Google. It will then report back with the list of vulnerabilities
@@ -18,11 +21,10 @@ A rollup summary at the end of the report can indicate (if commandline option pr
 
 All of the above information will be contained in the _ProjectName__report.txt output file. 2 other files are created which contain json representations of the vulnerabilities found and a mapping to the SBOM files they were found in. These were designed to be used in pipeline actions to support decision gates.
 
-Has been tested reasonably so far against CycloneDX formated SBOMs.
-This is the initial attempt for including SPDX formated SBOMs.
+Has been tested reasonably so far against CycloneDX and SPDX formated SBOMs.
 Your SBOMPath may include a mix of CycloneDX and SPDX SBOMs.
 
-CVSS v3.0 and 3.1 are supported completely and validated against the FIRST.org calculator. CVSS 4.0 scores are incorporated and are being validated against the FIRST.org calculator.
+CVSS v4.0, v3.0 and 3.1 are supported completely and validated against the FIRST.org calculator.
 
 ## Usage
 SBOMResearcher -SBOMPath "_{Path to SBOM File or Directory}_" -wrkDir

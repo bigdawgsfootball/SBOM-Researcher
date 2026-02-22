@@ -71,7 +71,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
     It "returns the correct base score for a CRITICAL severity CVSS v4.0 string" {
         # Arrange
         $CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"
-        $expectedBaseScore = 9.4
+        $expectedBaseScore = 9.3
 
         # Act
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
@@ -83,7 +83,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
     It "returns the correct base score for a HIGH severity CVSS v4.0 string" {
         # Arrange
         $CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:L/VA:N/SC:L/SI:L/SA:N"
-        $expectedBaseScore = 8.9
+        $expectedBaseScore = 8.8
 
         # Act
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
@@ -95,7 +95,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
     It "returns the correct base score for a MEDIUM severity CVSS v4.0 string" {
         # Arrange
         $CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:L/VI:L/VA:N/SC:L/SI:L/SA:N"
-        $expectedBaseScore = 5.4
+        $expectedBaseScore = 5.3
 
         # Act
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
@@ -118,12 +118,12 @@ Describe "Convert-CVSS4StringToBaseScore" {
 
     It "returns the correct base score for additional examples" -TestCases @(
         @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"; ExpectedBaseScore = 10.0 }
-        @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:L/SI:L/SA:L"; ExpectedBaseScore = 5.9 }
-        @{ CVSSString = "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:P/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"; ExpectedBaseScore = 7.8 }
-        @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:A/VC:N/VI:N/VA:N/SC:L/SI:L/SA:N"; ExpectedBaseScore = 5.0 }
-        @{ CVSSString = "CVSS:4.0/AV:P/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"; ExpectedBaseScore = 6.9 }
+        @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:L/SI:L/SA:L"; ExpectedBaseScore = 6.9 }
+        @{ CVSSString = "CVSS:4.0/AV:L/AC:L/AT:N/PR:N/UI:P/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"; ExpectedBaseScore = 8.5 }
+        @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:A/VC:N/VI:N/VA:N/SC:L/SI:L/SA:N"; ExpectedBaseScore = 5.1 }
+        @{ CVSSString = "CVSS:4.0/AV:P/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"; ExpectedBaseScore = 7.0 }
         @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N"; ExpectedBaseScore = 0.0 }
-        @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N"; ExpectedBaseScore = 8.5 }
+        @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N"; ExpectedBaseScore = 7.1 }
     ) {
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
         $actualBaseScore | Should -Be $ExpectedBaseScore

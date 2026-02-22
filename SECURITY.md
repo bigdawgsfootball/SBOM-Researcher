@@ -13,5 +13,5 @@ currently being supported with security updates.
 ## Reporting a Vulnerability
 
 If you believe that there is a security vulnerability in this code, please
-notify me at bigdawgsfootball@gmail.com. Include as much detail as you can,
+submit an issue. Include as much detail as you can,
 and I will review and address as quickly as possible.

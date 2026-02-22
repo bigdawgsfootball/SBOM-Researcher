@@ -94,111 +94,539 @@ function Convert-CVSS3StringToBaseScore {
 }
 
 function Convert-CVSS4StringToBaseScore {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$CVSSVector
-    )
+<#
+.SYNOPSIS
+    Calculates a CVSS v4.0 score from a vector string.
 
-    # CVSS 4.0 metric weights (official, July 2024)
-    $metrics = @{
-        AV = @{ N = 0.85; A = 0.62; L = 0.55; P = 0.20 }
-        AC = @{ L = 0.77; H = 0.44 }
-        AT = @{ N = 0.85; P = 0.62 }
-        PR = @{ N = @{ U = 0.85; C = 0.85 }; L = @{ U = 0.62; C = 0.68 }; H = @{ U = 0.27; C = 0.50 } }
-        UI = @{ N = 0.85; A = 0.62; P = 0.68 }
-        VC = @{ H = 0.56; L = 0.22; N = 0.00 }
-        VI = @{ H = 0.56; L = 0.22; N = 0.00 }
-        VA = @{ H = 0.56; L = 0.22; N = 0.00 }
+.DESCRIPTION
+    Parses a CVSS v4.0 vector string and computes the numeric score and severity rating.
+    Algorithm and data structures are a direct translation of the official reference
+    implementation at https://github.com/FIRSTdotorg/cvss-v4-calculator (which is a fork
+    of https://github.com/RedHatProductSecurity/cvss-v4-calculator).
+
+.PARAMETER Vector
+    A CVSS v4.0 vector string, e.g.:
+    "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"
+
+.EXAMPLE
+    .\CVSSv4Calc.ps1 "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"
+    Score: 10.0  Severity: Critical  MacroVector: 000000
+
+.NOTES
+    Copyright (c) 2023 FIRST.ORG, Inc., Red Hat, and contributors
+    Licensed under BSD-2-Clause. PowerShell translation by Claude.
+#>
+
+param(
+    [Parameter(Mandatory = $false, Position = 0, ValueFromRemainingArguments = $true)]
+    [string[]]$Vectors
+)
+
+# ---------------------------------------------------------------------------
+# Lookup Tables (translated directly from constants4.py / cvss_lookup.js)
+# ---------------------------------------------------------------------------
+
+# MacroVector score table (270 entries)
+$CVSS_LOOKUP_GLOBAL = @{
+    "000000" = 10;   "000001" = 9.9;  "000010" = 9.8;  "000011" = 9.5;
+    "000020" = 9.5;  "000021" = 9.2;  "000100" = 10;   "000101" = 9.6;
+    "000110" = 9.3;  "000111" = 8.7;  "000120" = 9.1;  "000121" = 8.1;
+    "000200" = 9.3;  "000201" = 9.0;  "000210" = 8.9;  "000211" = 8.0;
+    "000220" = 8.1;  "000221" = 6.8;  "001000" = 9.8;  "001001" = 9.5;
+    "001010" = 9.5;  "001011" = 9.2;  "001020" = 9.0;  "001021" = 8.4;
+    "001100" = 9.3;  "001101" = 9.2;  "001110" = 8.9;  "001111" = 8.1;
+    "001120" = 8.1;  "001121" = 6.5;  "001200" = 8.8;  "001201" = 8.0;
+    "001210" = 7.8;  "001211" = 7.0;  "001220" = 6.9;  "001221" = 4.8;
+    "002001" = 9.2;  "002011" = 8.2;  "002021" = 7.2;  "002101" = 7.9;
+    "002111" = 6.9;  "002121" = 5.0;  "002201" = 6.9;  "002211" = 5.5;
+    "002221" = 2.7;  "010000" = 9.9;  "010001" = 9.7;  "010010" = 9.5;
+    "010011" = 9.2;  "010020" = 9.2;  "010021" = 8.5;  "010100" = 9.5;
+    "010101" = 9.1;  "010110" = 9.0;  "010111" = 8.3;  "010120" = 8.4;
+    "010121" = 7.1;  "010200" = 9.2;  "010201" = 8.1;  "010210" = 8.2;
+    "010211" = 7.1;  "010220" = 7.2;  "010221" = 5.3;  "011000" = 9.5;
+    "011001" = 9.3;  "011010" = 9.2;  "011011" = 8.5;  "011020" = 8.5;
+    "011021" = 7.3;  "011100" = 9.2;  "011101" = 8.2;  "011110" = 8.0;
+    "011111" = 7.2;  "011120" = 7.0;  "011121" = 5.9;  "011200" = 8.4;
+    "011201" = 7.0;  "011210" = 7.1;  "011211" = 5.2;  "011220" = 5.0;
+    "011221" = 3.0;  "012001" = 8.6;  "012011" = 7.5;  "012021" = 5.2;
+    "012101" = 7.1;  "012111" = 5.2;  "012121" = 2.9;  "012201" = 6.3;
+    "012211" = 2.9;  "012221" = 1.7;  "100000" = 9.8;  "100001" = 9.5;
+    "100010" = 9.4;  "100011" = 8.7;  "100020" = 9.1;  "100021" = 8.1;
+    "100100" = 9.4;  "100101" = 8.9;  "100110" = 8.6;  "100111" = 7.4;
+    "100120" = 7.7;  "100121" = 6.4;  "100200" = 8.7;  "100201" = 7.5;
+    "100210" = 7.4;  "100211" = 6.3;  "100220" = 6.3;  "100221" = 4.9;
+    "101000" = 9.4;  "101001" = 8.9;  "101010" = 8.8;  "101011" = 7.7;
+    "101020" = 7.6;  "101021" = 6.7;  "101100" = 8.6;  "101101" = 7.6;
+    "101110" = 7.4;  "101111" = 5.8;  "101120" = 5.9;  "101121" = 5.0;
+    "101200" = 7.2;  "101201" = 5.7;  "101210" = 5.7;  "101211" = 5.2;
+    "101220" = 5.2;  "101221" = 2.5;  "102001" = 8.3;  "102011" = 7.0;
+    "102021" = 5.4;  "102101" = 6.5;  "102111" = 5.8;  "102121" = 2.6;
+    "102201" = 5.3;  "102211" = 2.1;  "102221" = 1.3;  "110000" = 9.5;
+    "110001" = 9.0;  "110010" = 8.8;  "110011" = 7.6;  "110020" = 7.6;
+    "110021" = 7.0;  "110100" = 9.0;  "110101" = 7.7;  "110110" = 7.5;
+    "110111" = 6.2;  "110120" = 6.1;  "110121" = 5.3;  "110200" = 7.7;
+    "110201" = 6.6;  "110210" = 6.8;  "110211" = 5.9;  "110220" = 5.2;
+    "110221" = 3.0;  "111000" = 8.9;  "111001" = 7.8;  "111010" = 7.6;
+    "111011" = 6.7;  "111020" = 6.2;  "111021" = 5.8;  "111100" = 7.4;
+    "111101" = 5.9;  "111110" = 5.7;  "111111" = 5.7;  "111120" = 4.7;
+    "111121" = 2.3;  "111200" = 6.1;  "111201" = 5.2;  "111210" = 5.7;
+    "111211" = 2.9;  "111220" = 2.4;  "111221" = 1.6;  "112001" = 7.1;
+    "112011" = 5.9;  "112021" = 3.0;  "112101" = 5.8;  "112111" = 2.6;
+    "112121" = 1.5;  "112201" = 2.3;  "112211" = 1.3;  "112221" = 0.6;
+    "200000" = 9.3;  "200001" = 8.7;  "200010" = 8.6;  "200011" = 7.2;
+    "200020" = 7.5;  "200021" = 5.8;  "200100" = 8.6;  "200101" = 7.4;
+    "200110" = 7.4;  "200111" = 6.1;  "200120" = 5.6;  "200121" = 3.4;
+    "200200" = 7.0;  "200201" = 5.4;  "200210" = 5.2;  "200211" = 4.0;
+    "200220" = 4.0;  "200221" = 2.2;  "201000" = 8.5;  "201001" = 7.5;
+    "201010" = 7.4;  "201011" = 5.5;  "201020" = 6.2;  "201021" = 5.1;
+    "201100" = 7.2;  "201101" = 5.7;  "201110" = 5.5;  "201111" = 4.1;
+    "201120" = 4.6;  "201121" = 1.9;  "201200" = 5.3;  "201201" = 3.6;
+    "201210" = 3.4;  "201211" = 1.9;  "201220" = 1.9;  "201221" = 0.8;
+    "202001" = 6.4;  "202011" = 5.1;  "202021" = 2.0;  "202101" = 4.7;
+    "202111" = 2.1;  "202121" = 1.1;  "202201" = 2.4;  "202211" = 0.9;
+    "202221" = 0.4;  "210000" = 8.8;  "210001" = 7.5;  "210010" = 7.3;
+    "210011" = 5.3;  "210020" = 6.0;  "210021" = 5.0;  "210100" = 7.3;
+    "210101" = 5.5;  "210110" = 5.9;  "210111" = 4.0;  "210120" = 4.1;
+    "210121" = 2.0;  "210200" = 5.4;  "210201" = 4.3;  "210210" = 4.5;
+    "210211" = 2.2;  "210220" = 2.0;  "210221" = 1.1;  "211000" = 7.5;
+    "211001" = 5.5;  "211010" = 5.8;  "211011" = 4.5;  "211020" = 4.0;
+    "211021" = 2.1;  "211100" = 6.1;  "211101" = 5.1;  "211110" = 4.8;
+    "211111" = 1.8;  "211120" = 2.0;  "211121" = 0.9;  "211200" = 4.6;
+    "211201" = 1.8;  "211210" = 1.7;  "211211" = 0.7;  "211220" = 0.8;
+    "211221" = 0.2;  "212001" = 5.3;  "212011" = 2.4;  "212021" = 1.4;
+    "212101" = 2.4;  "212111" = 1.2;  "212121" = 0.5;  "212201" = 1.0;
+    "212211" = 0.3;  "212221" = 0.1
+}
+
+# MAX_COMPOSED: highest-severity vector strings for each EQ level
+$MAX_COMPOSED = @{
+    "eq1" = @{
+        "0" = @("AV:N/PR:N/UI:N/")
+        "1" = @("AV:A/PR:N/UI:N/", "AV:N/PR:L/UI:N/", "AV:N/PR:N/UI:P/")
+        "2" = @("AV:P/PR:N/UI:N/", "AV:A/PR:L/UI:P/")
     }
-
-    # CVSS 4.0 Impact Lookup Table (expanded for broader coverage)
-    $impactLookup = @{
-        '0-0' = 8.7
-        '0-1' = 5.6
-        '0-2' = 6.1
-        '1-0' = 1.8
-        '1-1' = 3.0
-        '1-2' = 4.5
-        '2-0' = 3.5
-        '2-1' = 2.6
-        '2-2' = 0.0
+    "eq2" = @{
+        "0" = @("AC:L/AT:N/")
+        "1" = @("AC:H/AT:N/", "AC:L/AT:P/")
     }
-
-    # Validate vector format (combined regex checks)
-    if ($CVSSVector -notmatch '^CVSS:4\.0/AV:[NALP]/AC:[LH]/AT:[NP]/PR:[NLH]/UI:[NAP]/VC:[NLH]/VI:[NLH]/VA:[NLH]/SC:[NLH]/SI:[NLH]/SA:[NLH](/(CR|IR|AR|MAV|MAC|MAT|MPR|MUI|MVC|MVI|MVA|MSC|MSI|MSA|R|V|RE|U):[A-Z])?$') {
-        throw "Invalid CVSS v4.0 string format"
-    }
-
-    $vector = $CVSSVector -replace '^CVSS:4\.0/', ''
-    $parts = @{}
-    foreach ($part in $vector.Split('/')) {
-        if ($part -match '^([A-Z]{1,3}):([A-Z]{1,2})$') {
-            $parts[$Matches[1]] = $Matches[2]
+    "eq3" = @{
+        "0" = @{
+            "0" = @("VC:H/VI:H/VA:H/CR:H/IR:H/AR:H/")
+            "1" = @("VC:H/VI:H/VA:L/CR:M/IR:M/AR:H/", "VC:H/VI:H/VA:H/CR:M/IR:M/AR:M/")
+        }
+        "1" = @{
+            "0" = @("VC:L/VI:H/VA:H/CR:H/IR:H/AR:H/", "VC:H/VI:L/VA:H/CR:H/IR:H/AR:H/")
+            "1" = @("VC:L/VI:H/VA:L/CR:H/IR:M/AR:H/", "VC:L/VI:H/VA:H/CR:H/IR:M/AR:M/",
+                    "VC:H/VI:L/VA:H/CR:M/IR:H/AR:M/", "VC:H/VI:L/VA:L/CR:M/IR:H/AR:H/",
+                    "VC:L/VI:L/VA:H/CR:H/IR:H/AR:M/")
+        }
+        "2" = @{
+            "1" = @("VC:L/VI:L/VA:L/CR:H/IR:H/AR:H/")
         }
     }
-
-    # Apply defaults for environmental/supplemental metrics
-    $defaultMetrics = @{
-        CR = 'M'; IR = 'M'; AR = 'M';
-        MAV = 'X'; MAC = 'X'; MAT = 'X'; MPR = 'X'; MUI = 'X'; MVC = 'X'; MVI = 'X'; MVA = 'X'; MSC = 'X'; MSI = 'X'; MSA = 'X';
-        R = 'X'; V = 'X'; RE = 'X'; U = 'X'
+    "eq4" = @{
+        "0" = @("SC:H/SI:S/SA:S/")
+        "1" = @("SC:H/SI:H/SA:H/")
+        "2" = @("SC:L/SI:L/SA:L/")
     }
-    foreach ($metric in $defaultMetrics.Keys) {
-        if (-not $parts.ContainsKey($metric)) {
-            $parts[$metric] = $defaultMetrics[$metric]
+    "eq5" = @{
+        "0" = @("E:A/")
+        "1" = @("E:P/")
+        "2" = @("E:U/")
+    }
+}
+
+# MAX_SEVERITY: depth of each EQ level (number of steps available)
+$MAX_SEVERITY = @{
+    "eq1"    = @{ 0 = 1; 1 = 4; 2 = 5 }
+    "eq2"    = @{ 0 = 1; 1 = 2 }
+    "eq3eq6" = @{
+        0 = @{ 0 = 7; 1 = 6 }
+        1 = @{ 0 = 8; 1 = 8 }
+        2 = @{ 1 = 10 }
+    }
+    "eq4"    = @{ 0 = 6; 1 = 5; 2 = 4 }
+    "eq5"    = @{ 0 = 1; 1 = 1; 2 = 1 }
+}
+
+# Metric level values for severity-distance calculation
+$AV_Levels = @{ "N" = 0.0; "A" = 0.1; "L" = 0.2; "P" = 0.3 }
+$PR_Levels = @{ "N" = 0.0; "L" = 0.1; "H" = 0.2 }
+$UI_Levels = @{ "N" = 0.0; "P" = 0.1; "A" = 0.2 }
+$AC_Levels = @{ "L" = 0.0; "H" = 0.1 }
+$AT_Levels = @{ "N" = 0.0; "P" = 0.1 }
+$VC_Levels = @{ "H" = 0.0; "L" = 0.1; "N" = 0.2 }
+$VI_Levels = @{ "H" = 0.0; "L" = 0.1; "N" = 0.2 }
+$VA_Levels = @{ "H" = 0.0; "L" = 0.1; "N" = 0.2 }
+$SC_Levels = @{ "H" = 0.1; "L" = 0.2; "N" = 0.3 }
+$SI_Levels = @{ "S" = 0.0; "H" = 0.1; "L" = 0.2; "N" = 0.3 }
+$SA_Levels = @{ "S" = 0.0; "H" = 0.1; "L" = 0.2; "N" = 0.3 }
+$CR_Levels = @{ "H" = 0.0; "M" = 0.1; "L" = 0.2 }
+$IR_Levels = @{ "H" = 0.0; "M" = 0.1; "L" = 0.2 }
+$AR_Levels = @{ "H" = 0.0; "M" = 0.1; "L" = 0.2 }
+
+# Valid values per metric
+$VALID_VALUES = @{
+    "AV"  = "N","A","L","P"
+    "AC"  = "L","H"
+    "AT"  = "N","P"
+    "PR"  = "N","L","H"
+    "UI"  = "N","P","A"
+    "VC"  = "H","L","N"
+    "VI"  = "H","L","N"
+    "VA"  = "H","L","N"
+    "SC"  = "H","L","N"
+    "SI"  = "H","L","N","S"
+    "SA"  = "H","L","N","S"
+    "E"   = "X","A","P","U"
+    "CR"  = "X","H","M","L"
+    "IR"  = "X","H","M","L"
+    "AR"  = "X","H","M","L"
+    "MAV" = "X","N","A","L","P"
+    "MAC" = "X","L","H"
+    "MAT" = "X","N","P"
+    "MPR" = "X","N","L","H"
+    "MUI" = "X","N","P","A"
+    "MVC" = "X","H","L","N"
+    "MVI" = "X","H","L","N"
+    "MVA" = "X","H","L","N"
+    "MSC" = "X","H","L","N"
+    "MSI" = "X","S","H","L","N"
+    "MSA" = "X","S","H","L","N"
+    "S"   = "X","N","P"
+    "AU"  = "X","N","Y"
+    "R"   = "X","A","U","I"
+    "V"   = "X","D","C"
+    "RE"  = "X","L","M","H"
+    "U"   = "X","Clear","Green","Amber","Red"
+}
+
+$MANDATORY_METRICS = "AV","AC","AT","PR","UI","VC","VI","VA","SC","SI","SA"
+
+# ---------------------------------------------------------------------------
+# Helper: parse the vector string
+# ---------------------------------------------------------------------------
+function Parse-Vector {
+    param([string]$VectorStr)
+
+    if (-not $VectorStr.StartsWith("CVSS:4.0/")) {
+        throw "Invalid CVSS v4.0 vector: must start with 'CVSS:4.0/'"
+    }
+    $metrics = @{}
+    $parts = $VectorStr.Substring(9) -split "/"
+    foreach ($part in $parts) {
+        if ($part -eq "") { throw "Empty field in vector" }
+        $kv = $part -split ":", 2
+        if ($kv.Count -ne 2) { throw "Malformed metric '$part'" }
+        $k = $kv[0]; $v = $kv[1]
+        if ($metrics.ContainsKey($k)) { throw "Duplicate metric '$k'" }
+        if (-not $VALID_VALUES.ContainsKey($k)) { throw "Unknown metric '$k'" }
+        if ($v -notin $VALID_VALUES[$k]) { throw "Invalid value '$v' for metric '$k'" }
+        $metrics[$k] = $v
+    }
+    foreach ($m in $MANDATORY_METRICS) {
+        if (-not $metrics.ContainsKey($m)) { throw "Missing mandatory metric '$m'" }
+    }
+    return $metrics
+}
+
+# ---------------------------------------------------------------------------
+# Helper: get effective metric value (applies Modified overrides and defaults)
+# Mirrors the m() function in cvss4.py
+# ---------------------------------------------------------------------------
+function Get-M {
+    param([hashtable]$Metrics, [string]$Metric)
+
+    $selected = $Metrics[$Metric]
+
+    if ($Metric -eq "E" -and $selected -eq "X") { return "A" }
+    if ($Metric -in "CR","IR","AR" -and $selected -eq "X") { return "H" }
+
+    $modMetric = "M" + $Metric
+    if ($Metrics.ContainsKey($modMetric) -and $Metrics[$modMetric] -ne "X") {
+        return $Metrics[$modMetric]
+    }
+    return $selected
+}
+
+# ---------------------------------------------------------------------------
+# Helper: expand all metrics so optional ones have defaults
+# ---------------------------------------------------------------------------
+function Expand-Metrics {
+    param([hashtable]$Metrics)
+    $exp = @{} + $Metrics
+    foreach ($abbr in "MAV","MAC","MAT","MPR","MUI","MVC","MVI","MVA","MSC","MSI","MSA") {
+        if (-not $exp.ContainsKey($abbr) -or $exp[$abbr] -eq "X") {
+            $exp[$abbr] = $exp[$abbr.Substring(1)]
         }
     }
+    foreach ($abbr in "S","AU","R","V","RE","U","CR","IR","AR","E") {
+        if (-not $exp.ContainsKey($abbr)) { $exp[$abbr] = "X" }
+    }
+    return $exp
+}
 
-    # Validate required metrics
-    $required = @('AV', 'AC', 'AT', 'PR', 'UI', 'VC', 'VI', 'VA', 'SC', 'SI', 'SA')
-    foreach ($r in $required) {
-        if (-not $parts.ContainsKey($r)) {
-            throw "Required metric '$r' missing in vector."
+# ---------------------------------------------------------------------------
+# Helper: extract a metric value from a max-vector fragment like "AV:N/PR:N/"
+# ---------------------------------------------------------------------------
+function Extract-M {
+    param([string]$Frag, [string]$Metric)
+    $tag = $Metric + ":"
+    $idx = $Frag.IndexOf($tag)
+    if ($idx -lt 0) { return $null }
+    $rest = $Frag.Substring($idx + $tag.Length)
+    $slash = $rest.IndexOf("/")
+    if ($slash -ge 0) { return $rest.Substring(0, $slash) } else { return $rest }
+}
+
+# ---------------------------------------------------------------------------
+# Compute MacroVector string (6 digits EQ1..EQ6)
+# ---------------------------------------------------------------------------
+function Get-MacroVector {
+    param([hashtable]$Metrics)
+
+    $AV = Get-M $Metrics "AV"; $PR = Get-M $Metrics "PR"; $UI = Get-M $Metrics "UI"
+    $AC = Get-M $Metrics "AC"; $AT = Get-M $Metrics "AT"
+    $VC = Get-M $Metrics "VC"; $VI = Get-M $Metrics "VI"; $VA = Get-M $Metrics "VA"
+    $SC = Get-M $Metrics "SC"; $SI = Get-M $Metrics "SI"; $SA = Get-M $Metrics "SA"
+    $MSI = Get-M $Metrics "MSI"; $MSA = Get-M $Metrics "MSA"
+    $E  = Get-M $Metrics "E"
+    $CR = Get-M $Metrics "CR"; $IR = Get-M $Metrics "IR"; $AR = Get-M $Metrics "AR"
+
+    # EQ1
+    if ($AV -eq "N" -and $PR -eq "N" -and $UI -eq "N") { $eq1 = "0" }
+    elseif ( ($AV -eq "N" -or $PR -eq "N" -or $UI -eq "N") -and
+             -not ($AV -eq "N" -and $PR -eq "N" -and $UI -eq "N") -and
+             $AV -ne "P" ) { $eq1 = "1" }
+    else { $eq1 = "2" }
+
+    # EQ2
+    $eq2 = if ($AC -eq "L" -and $AT -eq "N") { "0" } else { "1" }
+
+    # EQ3
+    if ($VC -eq "H" -and $VI -eq "H") { $eq3 = "0" }
+    elseif (-not ($VC -eq "H" -and $VI -eq "H") -and ($VC -eq "H" -or $VI -eq "H" -or $VA -eq "H")) { $eq3 = "1" }
+    else { $eq3 = "2" }
+
+    # EQ4
+    if ($MSI -eq "S" -or $MSA -eq "S") { $eq4 = "0" }
+    elseif (-not ($MSI -eq "S" -or $MSA -eq "S") -and ($SC -eq "H" -or $SI -eq "H" -or $SA -eq "H")) { $eq4 = "1" }
+    else { $eq4 = "2" }
+
+    # EQ5
+    $eq5 = switch ($E) { "A" { "0" } "P" { "1" } default { "2" } }
+
+    # EQ6
+    $eq6 = if (($CR -eq "H" -and $VC -eq "H") -or ($IR -eq "H" -and $VI -eq "H") -or ($AR -eq "H" -and $VA -eq "H")) { "0" } else { "1" }
+
+    return "$eq1$eq2$eq3$eq4$eq5$eq6"
+}
+
+# ---------------------------------------------------------------------------
+# Round to 1dp using "round half away from zero"
+# ---------------------------------------------------------------------------
+function Final-Rounding([double]$x) {
+    $eps = 1e-6
+    return [math]::Round($x + $eps, 1, [System.MidpointRounding]::AwayFromZero)
+}
+
+# ---------------------------------------------------------------------------
+# Main scoring algorithm
+# ---------------------------------------------------------------------------
+function Compute-Score {
+    param([hashtable]$Metrics)
+
+    # Score 0 when all impact metrics are None
+    $allNone = @("VC","VI","VA","SC","SI","SA") | ForEach-Object { Get-M $Metrics $_ } | Where-Object { $_ -ne "N" }
+    if (-not $allNone) { return 0.0 }
+
+    $mv = Get-MacroVector $Metrics
+    $value = [double]$CVSS_LOOKUP_GLOBAL[$mv]
+
+    $e1 = [int]"$($mv[0])"; $e2 = [int]"$($mv[1])"; $e3 = [int]"$($mv[2])"
+    $e4 = [int]"$($mv[3])"; $e5 = [int]"$($mv[4])"; $e6 = [int]"$($mv[5])"
+
+    # Next-lower MacroVectors for each EQ dimension
+    $eq1_next = "$($e1+1)$e2$e3$e4$e5$e6"
+    $eq2_next = "$e1$($e2+1)$e3$e4$e5$e6"
+    $eq4_next = "$e1$e2$e3$($e4+1)$e5$e6"
+    $eq5_next = "$e1$e2$e3$e4$($e5+1)$e6"
+
+    # EQ3+EQ6 combined (special stepping logic)
+    $eq3eq6_next = $null; $eq3eq6_next_l = $null; $eq3eq6_next_r = $null
+    if     ($e3 -eq 1 -and $e6 -eq 1) { $eq3eq6_next = "$e1$e2$($e3+1)$e4$e5$e6" }
+    elseif ($e3 -eq 0 -and $e6 -eq 1) { $eq3eq6_next = "$e1$e2$($e3+1)$e4$e5$e6" }
+    elseif ($e3 -eq 1 -and $e6 -eq 0) { $eq3eq6_next = "$e1$e2$e3$e4$e5$($e6+1)" }
+    elseif ($e3 -eq 0 -and $e6 -eq 0) {
+        $eq3eq6_next_l = "$e1$e2$e3$e4$e5$($e6+1)"
+        $eq3eq6_next_r = "$e1$e2$($e3+1)$e4$e5$e6"
+    } else { $eq3eq6_next = "$e1$e2$($e3+1)$e4$e5$($e6+1)" }
+
+    $NaN = [double]::NaN
+    function LookupOrNaN([string]$key) {
+        if ($CVSS_LOOKUP_GLOBAL.ContainsKey($key)) { [double]$CVSS_LOOKUP_GLOBAL[$key] } else { $NaN }
+    }
+
+    $s_eq1    = LookupOrNaN $eq1_next
+    $s_eq2    = LookupOrNaN $eq2_next
+    $s_eq4    = LookupOrNaN $eq4_next
+    $s_eq5    = LookupOrNaN $eq5_next
+    $s_eq3eq6 = if ($null -ne $eq3eq6_next_l) {
+        $sl = LookupOrNaN $eq3eq6_next_l; $sr = LookupOrNaN $eq3eq6_next_r
+        if ([double]::IsNaN($sl) -and [double]::IsNaN($sr)) { $NaN }
+        elseif ([double]::IsNaN($sl)) { $sr }
+        elseif ([double]::IsNaN($sr)) { $sl }
+        else { [math]::Max($sl, $sr) }
+    } else { LookupOrNaN $eq3eq6_next }
+
+    # Build all max-vectors for this cell and find the one the current vector falls within
+    $eq1m  = $MAX_COMPOSED["eq1"]["$e1"]
+    $eq2m  = $MAX_COMPOSED["eq2"]["$e2"]
+    $eq3e6 = $MAX_COMPOSED["eq3"]["$e3"]["$e6"]
+    $eq4m  = $MAX_COMPOSED["eq4"]["$e4"]
+    $eq5m  = $MAX_COMPOSED["eq5"]["$e5"]
+
+    $maxVecs = foreach ($a in $eq1m) { foreach ($b in $eq2m) { foreach ($c in $eq3e6) {
+        foreach ($d in $eq4m) { foreach ($f in $eq5m) { $a + $b + $c + $d + $f } } } } }
+
+    $sd = $null
+    foreach ($maxVec in $maxVecs) {
+        $dAV = $AV_Levels[(Get-M $Metrics "AV")] - $AV_Levels[(Extract-M $maxVec "AV")]
+        $dPR = $PR_Levels[(Get-M $Metrics "PR")] - $PR_Levels[(Extract-M $maxVec "PR")]
+        $dUI = $UI_Levels[(Get-M $Metrics "UI")] - $UI_Levels[(Extract-M $maxVec "UI")]
+        $dAC = $AC_Levels[(Get-M $Metrics "AC")] - $AC_Levels[(Extract-M $maxVec "AC")]
+        $dAT = $AT_Levels[(Get-M $Metrics "AT")] - $AT_Levels[(Extract-M $maxVec "AT")]
+        $dVC = $VC_Levels[(Get-M $Metrics "VC")] - $VC_Levels[(Extract-M $maxVec "VC")]
+        $dVI = $VI_Levels[(Get-M $Metrics "VI")] - $VI_Levels[(Extract-M $maxVec "VI")]
+        $dVA = $VA_Levels[(Get-M $Metrics "VA")] - $VA_Levels[(Extract-M $maxVec "VA")]
+        $dSC = $SC_Levels[(Get-M $Metrics "SC")] - $SC_Levels[(Extract-M $maxVec "SC")]
+        $dSI = $SI_Levels[(Get-M $Metrics "SI")] - $SI_Levels[(Extract-M $maxVec "SI")]
+        $dSA = $SA_Levels[(Get-M $Metrics "SA")] - $SA_Levels[(Extract-M $maxVec "SA")]
+        $dCR = $CR_Levels[(Get-M $Metrics "CR")] - $CR_Levels[(Extract-M $maxVec "CR")]
+        $dIR = $IR_Levels[(Get-M $Metrics "IR")] - $IR_Levels[(Extract-M $maxVec "IR")]
+        $dAR = $AR_Levels[(Get-M $Metrics "AR")] - $AR_Levels[(Extract-M $maxVec "AR")]
+
+        if ($dAV -ge 0 -and $dPR -ge 0 -and $dUI -ge 0 -and $dAC -ge 0 -and $dAT -ge 0 -and
+            $dVC -ge 0 -and $dVI -ge 0 -and $dVA -ge 0 -and $dSC -ge 0 -and $dSI -ge 0 -and
+            $dSA -ge 0 -and $dCR -ge 0 -and $dIR -ge 0 -and $dAR -ge 0) {
+            $sd = @{ AV=$dAV; PR=$dPR; UI=$dUI; AC=$dAC; AT=$dAT
+                     VC=$dVC; VI=$dVI; VA=$dVA; SC=$dSC; SI=$dSI; SA=$dSA
+                     CR=$dCR; IR=$dIR; AR=$dAR }
+            break
         }
     }
-
-    # Determine Scope for PR calculation
-    $scopeChanged = ($parts['SC'] -eq 'H' -or $parts['SI'] -eq 'H' -or $parts['SA'] -eq 'H') ? 'C' : 'U'
-
-    # Calculate Exploitability
-    $AV = $metrics['AV'][$parts['AV']]
-    $AC = $metrics['AC'][$parts['AC']]
-    $AT = $metrics['AT'][$parts['AT']]
-    $PR = $metrics['PR'][$parts['PR']][$scopeChanged]
-    $UI = $metrics['UI'][$parts['UI']]
-    $exploitability = 8.22 * $AV * $AC * $AT * $PR * $UI
-
-    # Determine EQ3 (Vulnerable System Impact)
-    if ($parts['VC'] -eq 'H' -or $parts['VI'] -eq 'H' -or $parts['VA'] -eq 'H') {
-        $EQ3 = 0
-    } elseif ($parts['VC'] -eq 'L' -or $parts['VI'] -eq 'L' -or $parts['VA'] -eq 'L') {
-        $EQ3 = 1
-    } else {
-        $EQ3 = 2
+    if ($null -eq $sd) {
+        $sd = @{ AV=0;PR=0;UI=0;AC=0;AT=0;VC=0;VI=0;VA=0;SC=0;SI=0;SA=0;CR=0;IR=0;AR=0 }
     }
 
-    # Determine EQ6 (Subsequent System Impact)
-    if ($parts['SC'] -eq 'H' -or $parts['SI'] -eq 'H' -or $parts['SA'] -eq 'H') {
-        $EQ6 = 0
-    } elseif ($parts['SC'] -eq 'L' -or $parts['SI'] -eq 'L' -or $parts['SA'] -eq 'L') {
-        $EQ6 = 1
+    # Aggregate distances per EQ
+    $dist_eq1    = $sd.AV + $sd.PR + $sd.UI
+    $dist_eq2    = $sd.AC + $sd.AT
+    $dist_eq3eq6 = $sd.VC + $sd.VI + $sd.VA + $sd.CR + $sd.IR + $sd.AR
+    $dist_eq4    = $sd.SC + $sd.SI + $sd.SA
+
+    $step = 0.1
+    $maxsev_eq1    = $MAX_SEVERITY["eq1"][$e1] * $step
+    $maxsev_eq2    = $MAX_SEVERITY["eq2"][$e2] * $step
+    $maxsev_eq3eq6 = $MAX_SEVERITY["eq3eq6"][$e3][$e6] * $step
+    $maxsev_eq4    = $MAX_SEVERITY["eq4"][$e4] * $step
+
+    $avail_eq1    = $value - $s_eq1
+    $avail_eq2    = $value - $s_eq2
+    $avail_eq3eq6 = $value - $s_eq3eq6
+    $avail_eq4    = $value - $s_eq4
+    $avail_eq5    = $value - $s_eq5
+
+    $n = 0; $norm1=0.0; $norm2=0.0; $norm3=0.0; $norm4=0.0; $norm5=0.0
+
+    if (-not [double]::IsNaN($avail_eq1)    -and $avail_eq1    -ge 0) { $n++; $norm1 = $avail_eq1    * ($dist_eq1    / $maxsev_eq1)    }
+    if (-not [double]::IsNaN($avail_eq2)    -and $avail_eq2    -ge 0) { $n++; $norm2 = $avail_eq2    * ($dist_eq2    / $maxsev_eq2)    }
+    if (-not [double]::IsNaN($avail_eq3eq6) -and $avail_eq3eq6 -ge 0) { $n++; $norm3 = $avail_eq3eq6 * ($dist_eq3eq6 / $maxsev_eq3eq6) }
+    if (-not [double]::IsNaN($avail_eq4)    -and $avail_eq4    -ge 0) { $n++; $norm4 = $avail_eq4    * ($dist_eq4    / $maxsev_eq4)    }
+    if (-not [double]::IsNaN($avail_eq5)    -and $avail_eq5    -ge 0) { $n++; $norm5 = 0.0 }   # eq5 pct always 0
+
+    $mean = if ($n -eq 0) { 0.0 } else { ($norm1 + $norm2 + $norm3 + $norm4 + $norm5) / $n }
+
+    $value -= $mean
+    $value = [math]::Max(0.0, [math]::Min(10.0, $value))
+    return Final-Rounding $value
+}
+
+# ---------------------------------------------------------------------------
+# Severity from score
+# ---------------------------------------------------------------------------
+function Get-Severity([double]$Score) {
+    if ($Score -eq 0.0) { "None" }
+    elseif ($Score -le 3.9) { "Low" }
+    elseif ($Score -le 6.9) { "Medium" }
+    elseif ($Score -le 8.9) { "High" }
+    else { "Critical" }
+}
+
+# ---------------------------------------------------------------------------
+# Helper: score one vector string, return a result object (or error row)
+# ---------------------------------------------------------------------------
+function Invoke-CVSSScore {
+    param([string]$Vec)
+    try {
+        $parsed   = Parse-Vector $Vec
+        $expanded = Expand-Metrics $parsed
+        $macro    = Get-MacroVector $expanded
+        $score    = Compute-Score $expanded
+        $severity = Get-Severity $score
+        [PSCustomObject]@{
+            Score       = ("{0:F1}" -f $score)
+            Severity    = $severity
+            MacroVector = $macro
+            Vector      = $Vec
+            Error       = ""
+        }
+    } catch {
+        [PSCustomObject]@{
+            Score       = ""
+            Severity    = ""
+            MacroVector = ""
+            Vector      = $Vec
+            Error       = "$_"
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+if ($Vectors -and $Vectors.Count -gt 0) {
+    # ---- One or more vectors passed as arguments ----
+    $results = $Vectors | ForEach-Object { Invoke-CVSSScore $_ }
+
+    if ($results.Count -eq 1 -and -not $results[0].Error) {
+        $r = $results[0]
+        return $r
+        #Write-Host ("Score: {0}  Severity: {1}  MacroVector: {2}" -f $r.Score, $r.Severity, $r.MacroVector)
     } else {
-        $EQ6 = 2
+        #$results | Format-Table -AutoSize -Property Score, Severity, MacroVector, Vector, Error
+        return $results.Score
     }
 
-    # Get Impact Score from Lookup Table
-    $impactKey = "$EQ3-$EQ6"
-    $Impact = $impactLookup[$impactKey]
+    # Exit with error code if any rows have errors
+    if ($results | Where-Object { $_.Error }) { exit 1 }
 
-    # Calculate Base Score
-    if ($Impact -le 0) {
-        $BaseScore = 0
-    } else {
-        $BaseScore = [Math]::Round([Math]::Min($Impact + $exploitability, 10), 1, [MidpointRounding]::ToEven)
+} else {
+    # ---- Interactive mode ----
+    Write-Host "CVSS v4.0 Interactive Calculator  (Ctrl+C or blank input to exit)"
+    Write-Host ""
+    while ($true) {
+        $vecStr = Read-Host "Enter CVSS v4.0 vector"
+        if ([string]::IsNullOrWhiteSpace($vecStr)) { break }
+        $r = Invoke-CVSSScore $vecStr.Trim()
+        if ($r.Error) {
+            Write-Host "  Error: $($r.Error)" -ForegroundColor Red
+        } else {
+            Write-Host ("  Score: {0}  Severity: {1}  MacroVector: {2}" -f $r.Score, $r.Severity, $r.MacroVector)
+        }
+        Write-Host ""
     }
-
-    return $BaseScore
+}
 }
 function ConvertTo-Version {
     param (
@@ -406,7 +834,7 @@ function Test-PurlFormat {
     #$purlRegex = '^pkg:[a-z]+/[a-zA-Z0-9._-]+@[0-9]+\.[0-9]+\.[0-9]+$'
     $purlDecoded = [System.Web.HttpUtility]::UrlDecode($purl)
 
-    $purlRegex = '^pkg:[a-z0-9.+-]+/[a-zA-Z0-9._\-]+(/[a-zA-Z0-9._\-]+)*(@[^?\s]+)?(\?[^\s#]*)?(#[^\s]*)?$'
+    $purlRegex = '^pkg:[a-z0-9-]+/([a-zA-Z0-9._~-]+/?)+@([v0-9]+\.(\*|[0-9]+)\.(\*|[0-9]+)([+-][a-zA-Z0-9._-]+)?)$'
 
     if ($purlDecoded -match $purlRegex) {
         return $true
@@ -480,11 +908,15 @@ function Get-VulnList {
 
         # Build the JSON body for the OSV API query
         # noticed that OSV.dev records cargo package type as crates.io, need to handle that here on query
-        $body = @{
-            "package" = @{
-                "purl" = $purl.purl.Replace("pkg:cargo/","pkg:crates.io/")
+        try {
+                $body = @{
+                    "package" = @{
+                        "purl" = $purl.purl.replace(":cargo/",":crates.io/")
+                    }
+                } | ConvertTo-Json
+            } catch {
+                write-output "Error constructing OSV.dev query body from purl $($purl) at index $($index): $($_.Exception.Message)"
             }
-        } | ConvertTo-Json
 
         # Invoke the OSV API with the JSON body and save the response
         try {
@@ -544,12 +976,37 @@ function Get-VulnList {
                     $vuln.I = $vulnerability.severity[0].score.split("/")[7].split(":")[1]
                     $vuln.A = $vulnerability.severity[0].score.split("/")[8].split(":")[1]
 
-                    if ($vulnerability.severity.score.contains("3.0")) {
-                        #CVSS 3.0
-                        $scoreuri = "https://www.first.org/cvss/calculator/3-0#"
-                        $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
-                        try {
-                            $vuln.Score = Convert-CVSS3StringToBaseScore $vulnerability.severity.score
+                     $CVSSCount = $vulnerability.severity.score.count
+                        if ($CVSSCount -gt 1) {
+                            $CVSSSevScore = $vulnerability.severity.score[0]
+                        } else {
+                            $CVSSSevScore = $vulnerability.severity.score
+                        }
+
+                        if ($CVSSSevScore.contains("3.0")) {
+                            #CVSS 3.0
+                            $scoreuri = "https://www.first.org/cvss/calculator/3.0#"
+                            $vuln.ScoreURI = $scoreuri + $CVSSSevScore
+                            try {
+                                $vuln.Score = Convert-CVSS3StringToBaseScore $CVSSSevScore
+                            } catch {
+                            Write-Output "$_ for $vulnerability" | Out-File -FilePath $outfile -Append
+                        }
+
+                        switch ($vuln.Score)
+                        {
+                            { $_ -ge 9.0 }  { $vuln.Severity = "CRITICAL"; Break }
+                            { ($_ -ge 7.0) -and ($_ -lt 9.0) } { $vuln.Severity = "HIGH"; Break }
+                            { ($_ -ge 4.0) -and ($_ -lt 7.0) } { $vuln.Severity = "MEDIUM"; Break }
+                            { ($_ -lt 4.0) } { $vuln.Severity = "LOW"; Break }
+                            default { $vuln.Severity - "UNKNOWN"}
+                        }
+                    } elseif ($CVSSSevScore.contains("3.1")) {
+                            #CVSS 3.1
+                            $scoreuri = "https://www.first.org/cvss/calculator/3.1#"
+                            $vuln.ScoreURI = $scoreuri + $CVSSSevScore
+                            try {
+                                $vuln.Score = Convert-CVSS3StringToBaseScore $CVSSSevScore
                         } catch {
                             Write-Output "$_ for $vulnerability" | Out-File -FilePath $outfile -Append
                         }
@@ -562,30 +1019,12 @@ function Get-VulnList {
                             { ($_ -lt 4.0) } { $vuln.Severity = "LOW"; Break }
                             default { $vuln.Severity - "UNKNOWN"}
                         }
-                    } elseif ($vulnerability.severity.score.contains("3.1")) {
-                        #CVSS 3.1
-                        $scoreuri = "https://www.first.org/cvss/calculator/3-1#"
-                        $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
-                        try {
-                            $vuln.Score = Convert-CVSS3StringToBaseScore $vulnerability.severity.score
-                        } catch {
-                            Write-Output "$_ for $vulnerability" | Out-File -FilePath $outfile -Append
-                        }
-
-                        switch ($vuln.Score)
-                        {
-                            { $_ -ge 9.0 }  { $vuln.Severity = "CRITICAL"; Break }
-                            { ($_ -ge 7.0) -and ($_ -lt 9.0) } { $vuln.Severity = "HIGH"; Break }
-                            { ($_ -ge 4.0) -and ($_ -lt 7.0) } { $vuln.Severity = "MEDIUM"; Break }
-                            { ($_ -lt 4.0) } { $vuln.Severity = "LOW"; Break }
-                            default { $vuln.Severity - "UNKNOWN"}
-                        }
-                    } elseif ($vulnerability.severity.score.contains("4.0")) {
-                        #CVSS 4.0
-                        $scoreuri = "https://www.first.org/cvss/calculator/4-0#"
-                        $vuln.ScoreURI = $scoreuri + $vulnerability.severity.score
-                        try {
-                            $vuln.Score = Convert-CVSS4StringToBaseScore $vulnerability.severity.score
+                    } elseif ($CVSSSevScore.contains("4.0")) {
+                            #CVSS 4.0
+                            $scoreuri = "https://www.first.org/cvss/calculator/4.0#"
+                            $vuln.ScoreURI = $scoreuri + $CVSSSevScore
+                            try {
+                                $vuln.Score = Convert-CVSS4StringToBaseScore $CVSSSevScore
                         } catch {
                             Write-Output "$_ for $vulnerability" | Out-File -FilePath $outfile -Append
                         }
@@ -661,7 +1100,7 @@ function Get-VulnList {
             }
         } else {
             if ($ListAll) {
-                Write-Output "OSV found no vulnerabilities for $(purl.purl)" | Out-File -FilePath $outfile -Append
+                Write-Output "OSV found no vulnerabilities for " $purl.purl | Out-File -FilePath $outfile -Append
             }
         }
     }
@@ -686,7 +1125,7 @@ function Get-SBOMType {
 
 function Get-CycloneDXComponentList {
     [CmdletBinding()]
-    [OutputType([System.Collections.Generic.List[PSObject]])]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
         [Parameter(Mandatory=$true)][PSObject]$allLicenses,
@@ -767,7 +1206,7 @@ function Get-CycloneDXComponentList {
 
 function Get-SPDXComponentList {
     [CmdletBinding()]
-    [OutputType([System.Collections.Generic.List[PSObject]])]
+    [OutputType([string])]
     param(
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
         [Parameter(Mandatory=$true)][PSObject]$allLicenses,
@@ -792,13 +1231,13 @@ function Get-SPDXComponentList {
             if ($testVersion -eq "") {
                 #$testVersion = ($package.versioninfo).trimstart('^', '>', '<', '=', ' ')
                 $rangePattern = '(?<=\>|\>=)\d+(\.\d+){0,2}'
+                
                 $testVersion = [regex]::Match(($package.versionInfo -replace " ",""), $rangePattern).Value
         }
 
             if ($testVersion -ne "") {
                 $components = $testVersion.Split('.')
 
-                #if ($components.count -lt 3) {
                 while ($components.count -lt 3) {
                     $testversion += ".0"
                     $components = $testVersion.Split('.')
@@ -807,14 +1246,6 @@ function Get-SPDXComponentList {
 
             $testName = Get-NameFromPurl -purl $package.externalRefs.referenceLocator
             if ($testName -eq "") {
-                <#$testName = ($package.name).Replace(':','/')
-                $purlString = "pkg:" + $testName + "@" + $testVersion
-                $parts = $testname.split('/')
-                if ($parts.count -gt 1) {
-                    $testName = $parts[1]
-                } else {
-                    $testName = $parts[0]
-                }#>
                 #encountered some differences in the SPDX purl formats, need to handle those here
                 $testName = $package.externalRefs.referenceLocator
                 $purlString = $testName + "@" + $testVersion
@@ -964,4 +1395,4 @@ function SBOMResearcher {
     }
 }
 
-#SBOMResearcher -SBOMPath "C:\Temp\SBOMResearcher\smalltest" -wrkDir "C:\Temp\SBOMResearcher\reports" -PrintLicenseInfo $true -minScore 7.0
+SBOMResearcher -SBOMPath "C:\Temp\sbom_test\" -ProjectName "Testing" -wrkDir "C:\Temp\sbom_test\reports" -PrintLicenseInfo $true -minScore 7.0
