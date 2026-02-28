@@ -306,7 +306,7 @@ $MANDATORY_METRICS = "AV","AC","AT","PR","UI","VC","VI","VA","SC","SI","SA"
 # ---------------------------------------------------------------------------
 # Helper: parse the vector string
 # ---------------------------------------------------------------------------
-function Parse-Vector {
+function ConvertFrom-Vector {
     param([string]$VectorStr)
 
     if (-not $VectorStr.StartsWith("CVSS:4.0/")) {
@@ -369,7 +369,7 @@ function Expand-Metrics {
 # ---------------------------------------------------------------------------
 # Helper: extract a metric value from a max-vector fragment like "AV:N/PR:N/"
 # ---------------------------------------------------------------------------
-function Extract-M {
+function Get-MetricValue {
     param([string]$Frag, [string]$Metric)
     $tag = $Metric + ":"
     $idx = $Frag.IndexOf($tag)
@@ -425,7 +425,7 @@ function Get-MacroVector {
 # ---------------------------------------------------------------------------
 # Round to 1dp using "round half away from zero"
 # ---------------------------------------------------------------------------
-function Final-Rounding([double]$x) {
+function Convert-RoundingValue([double]$x) {
     $eps = 1e-6
     return [math]::Round($x + $eps, 1, [System.MidpointRounding]::AwayFromZero)
 }
@@ -433,7 +433,7 @@ function Final-Rounding([double]$x) {
 # ---------------------------------------------------------------------------
 # Main scoring algorithm
 # ---------------------------------------------------------------------------
-function Compute-Score {
+function Get-CVSSScore {
     param([hashtable]$Metrics)
 
     # Score 0 when all impact metrics are None
@@ -491,20 +491,20 @@ function Compute-Score {
 
     $sd = $null
     foreach ($maxVec in $maxVecs) {
-        $dAV = $AV_Levels[(Get-M $Metrics "AV")] - $AV_Levels[(Extract-M $maxVec "AV")]
-        $dPR = $PR_Levels[(Get-M $Metrics "PR")] - $PR_Levels[(Extract-M $maxVec "PR")]
-        $dUI = $UI_Levels[(Get-M $Metrics "UI")] - $UI_Levels[(Extract-M $maxVec "UI")]
-        $dAC = $AC_Levels[(Get-M $Metrics "AC")] - $AC_Levels[(Extract-M $maxVec "AC")]
-        $dAT = $AT_Levels[(Get-M $Metrics "AT")] - $AT_Levels[(Extract-M $maxVec "AT")]
-        $dVC = $VC_Levels[(Get-M $Metrics "VC")] - $VC_Levels[(Extract-M $maxVec "VC")]
-        $dVI = $VI_Levels[(Get-M $Metrics "VI")] - $VI_Levels[(Extract-M $maxVec "VI")]
-        $dVA = $VA_Levels[(Get-M $Metrics "VA")] - $VA_Levels[(Extract-M $maxVec "VA")]
-        $dSC = $SC_Levels[(Get-M $Metrics "SC")] - $SC_Levels[(Extract-M $maxVec "SC")]
-        $dSI = $SI_Levels[(Get-M $Metrics "SI")] - $SI_Levels[(Extract-M $maxVec "SI")]
-        $dSA = $SA_Levels[(Get-M $Metrics "SA")] - $SA_Levels[(Extract-M $maxVec "SA")]
-        $dCR = $CR_Levels[(Get-M $Metrics "CR")] - $CR_Levels[(Extract-M $maxVec "CR")]
-        $dIR = $IR_Levels[(Get-M $Metrics "IR")] - $IR_Levels[(Extract-M $maxVec "IR")]
-        $dAR = $AR_Levels[(Get-M $Metrics "AR")] - $AR_Levels[(Extract-M $maxVec "AR")]
+        $dAV = $AV_Levels[(Get-M $Metrics "AV")] - $AV_Levels[(Get-MetricValue $maxVec "AV")]
+        $dPR = $PR_Levels[(Get-M $Metrics "PR")] - $PR_Levels[(Get-MetricValue $maxVec "PR")]
+        $dUI = $UI_Levels[(Get-M $Metrics "UI")] - $UI_Levels[(Get-MetricValue $maxVec "UI")]
+        $dAC = $AC_Levels[(Get-M $Metrics "AC")] - $AC_Levels[(Get-MetricValue $maxVec "AC")]
+        $dAT = $AT_Levels[(Get-M $Metrics "AT")] - $AT_Levels[(Get-MetricValue $maxVec "AT")]
+        $dVC = $VC_Levels[(Get-M $Metrics "VC")] - $VC_Levels[(Get-MetricValue $maxVec "VC")]
+        $dVI = $VI_Levels[(Get-M $Metrics "VI")] - $VI_Levels[(Get-MetricValue $maxVec "VI")]
+        $dVA = $VA_Levels[(Get-M $Metrics "VA")] - $VA_Levels[(Get-MetricValue $maxVec "VA")]
+        $dSC = $SC_Levels[(Get-M $Metrics "SC")] - $SC_Levels[(Get-MetricValue $maxVec "SC")]
+        $dSI = $SI_Levels[(Get-M $Metrics "SI")] - $SI_Levels[(Get-MetricValue $maxVec "SI")]
+        $dSA = $SA_Levels[(Get-M $Metrics "SA")] - $SA_Levels[(Get-MetricValue $maxVec "SA")]
+        $dCR = $CR_Levels[(Get-M $Metrics "CR")] - $CR_Levels[(Get-MetricValue $maxVec "CR")]
+        $dIR = $IR_Levels[(Get-M $Metrics "IR")] - $IR_Levels[(Get-MetricValue $maxVec "IR")]
+        $dAR = $AR_Levels[(Get-M $Metrics "AR")] - $AR_Levels[(Get-MetricValue $maxVec "AR")]
 
         if ($dAV -ge 0 -and $dPR -ge 0 -and $dUI -ge 0 -and $dAC -ge 0 -and $dAT -ge 0 -and
             $dVC -ge 0 -and $dVI -ge 0 -and $dVA -ge 0 -and $dSC -ge 0 -and $dSI -ge 0 -and
@@ -549,7 +549,7 @@ function Compute-Score {
 
     $value -= $mean
     $value = [math]::Max(0.0, [math]::Min(10.0, $value))
-    return Final-Rounding $value
+    return Convert-RoundingValue $value
 }
 
 # ---------------------------------------------------------------------------
@@ -569,10 +569,10 @@ function Get-Severity([double]$Score) {
 function Invoke-CVSSScore {
     param([string]$Vec)
     try {
-        $parsed   = Parse-Vector $Vec
+        $parsed   = ConvertFrom-Vector $Vec
         $expanded = Expand-Metrics $parsed
         $macro    = Get-MacroVector $expanded
-        $score    = Compute-Score $expanded
+        $score    = Get-CVSSScore $expanded
         $severity = Get-Severity $score
         [PSCustomObject]@{
             Score       = ("{0:F1}" -f $score)
@@ -602,7 +602,7 @@ if ($Vectors -and $Vectors.Count -gt 0) {
     if ($results.Count -eq 1 -and -not $results[0].Error) {
         $r = $results[0]
         return $r
-        #Write-Host ("Score: {0}  Severity: {1}  MacroVector: {2}" -f $r.Score, $r.Severity, $r.MacroVector)
+        #write-output ("Score: {0}  Severity: {1}  MacroVector: {2}" -f $r.Score, $r.Severity, $r.MacroVector)
     } else {
         #$results | Format-Table -AutoSize -Property Score, Severity, MacroVector, Vector, Error
         return $results.Score
@@ -613,18 +613,18 @@ if ($Vectors -and $Vectors.Count -gt 0) {
 
 } else {
     # ---- Interactive mode ----
-    Write-Host "CVSS v4.0 Interactive Calculator  (Ctrl+C or blank input to exit)"
-    Write-Host ""
+    write-output "CVSS v4.0 Interactive Calculator  (Ctrl+C or blank input to exit)"
+    write-output ""
     while ($true) {
         $vecStr = Read-Host "Enter CVSS v4.0 vector"
         if ([string]::IsNullOrWhiteSpace($vecStr)) { break }
         $r = Invoke-CVSSScore $vecStr.Trim()
         if ($r.Error) {
-            Write-Host "  Error: $($r.Error)" -ForegroundColor Red
+            write-output "  Error: $($r.Error)" -ForegroundColor Red
         } else {
-            Write-Host ("  Score: {0}  Severity: {1}  MacroVector: {2}" -f $r.Score, $r.Severity, $r.MacroVector)
+            write-output ("  Score: {0}  Severity: {1}  MacroVector: {2}" -f $r.Score, $r.Severity, $r.MacroVector)
         }
-        Write-Host ""
+        write-output ""
     }
 }
 }
@@ -1231,7 +1231,7 @@ function Get-SPDXComponentList {
             if ($testVersion -eq "") {
                 #$testVersion = ($package.versioninfo).trimstart('^', '>', '<', '=', ' ')
                 $rangePattern = '(?<=\>|\>=)\d+(\.\d+){0,2}'
-                
+
                 $testVersion = [regex]::Match(($package.versionInfo -replace " ",""), $rangePattern).Value
         }
 
