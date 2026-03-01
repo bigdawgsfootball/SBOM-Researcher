@@ -77,7 +77,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
 
         # Assert
-        $actualBaseScore[1] | Should -Be $expectedBaseScore
+        $actualBaseScore | Should -Be $expectedBaseScore
     }
 
     It "returns the correct base score for a HIGH severity CVSS v4.0 string" {
@@ -89,7 +89,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
 
         # Assert
-        $actualBaseScore[1] | Should -Be $expectedBaseScore
+        $actualBaseScore | Should -Be $expectedBaseScore
     }
 
     It "returns the correct base score for a MEDIUM severity CVSS v4.0 string" {
@@ -101,7 +101,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
 
         # Assert
-        $actualBaseScore[1] | Should -Be $expectedBaseScore
+        $actualBaseScore | Should -Be $expectedBaseScore
     }
 
     It "returns the correct base score for a LOW severity CVSS v4.0 string" {
@@ -113,7 +113,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
 
         # Assert
-        $actualBaseScore[1] | Should -Be $expectedBaseScore
+        $actualBaseScore | Should -Be $expectedBaseScore
     }
 
     It "returns the correct base score for additional examples" -TestCases @(
@@ -126,7 +126,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N"; ExpectedBaseScore = 7.1 }
     ) {
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
-        $actualBaseScore[1] | Should -Be $ExpectedBaseScore
+        $actualBaseScore | Should -Be $ExpectedBaseScore
     }
 
     It "throws an error for an invalid CVSS v4.0 string" {
