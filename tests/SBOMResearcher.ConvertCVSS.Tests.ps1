@@ -74,7 +74,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $expectedBaseScore = 9.3
 
         # Act
-        $actualBaseScore = Convert-CVSS4StringToBaseScore -Vectors $CVSSString
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
 
         # Assert
         $actualBaseScore[1] | Should -Be $expectedBaseScore
@@ -86,7 +86,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $expectedBaseScore = 8.8
 
         # Act
-        $actualBaseScore = Convert-CVSS4StringToBaseScore -Vectors $CVSSString
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
 
         # Assert
         $actualBaseScore[1] | Should -Be $expectedBaseScore
@@ -98,7 +98,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $expectedBaseScore = 5.3
 
         # Act
-        $actualBaseScore = Convert-CVSS4StringToBaseScore -Vectors $CVSSString
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
 
         # Assert
         $actualBaseScore[1] | Should -Be $expectedBaseScore
@@ -110,7 +110,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $expectedBaseScore = 2.4
 
         # Act
-        $actualBaseScore = Convert-CVSS4StringToBaseScore -Vectors $CVSSString
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
 
         # Assert
         $actualBaseScore[1] | Should -Be $expectedBaseScore
@@ -125,7 +125,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:N/SC:N/SI:N/SA:N"; ExpectedBaseScore = 0.0 }
         @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N"; ExpectedBaseScore = 7.1 }
     ) {
-        $actualBaseScore = Convert-CVSS4StringToBaseScore -Vectors $CVSSString
+        $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSString $CVSSString
         $actualBaseScore[1] | Should -Be $ExpectedBaseScore
     }
 
