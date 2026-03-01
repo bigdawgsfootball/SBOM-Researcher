@@ -310,22 +310,22 @@ function ConvertFrom-Vector {
     param([string]$VectorStr)
 
     if (-not $VectorStr.StartsWith("CVSS:4.0/")) {
-        throw "Invalid CVSS v4.0 vector: must start with 'CVSS:4.0/'"
+        throw "Invalid CVSS v4.0 string format"
     }
     $metrics = @{}
     $parts = $VectorStr.Substring(9) -split "/"
     foreach ($part in $parts) {
-        if ($part -eq "") { throw "Empty field in vector" }
+        if ($part -eq "") { throw "Invalid CVSS v4.0 string format" }
         $kv = $part -split ":", 2
-        if ($kv.Count -ne 2) { throw "Malformed metric '$part'" }
+        if ($kv.Count -ne 2) { throw "Invalid CVSS v4.0 string format" }
         $k = $kv[0]; $v = $kv[1]
-        if ($metrics.ContainsKey($k)) { throw "Duplicate metric '$k'" }
-        if (-not $VALID_VALUES.ContainsKey($k)) { throw "Unknown metric '$k'" }
-        if ($v -notin $VALID_VALUES[$k]) { throw "Invalid value '$v' for metric '$k'" }
+        if ($metrics.ContainsKey($k)) { throw "Invalid CVSS v4.0 string format" }
+        if (-not $VALID_VALUES.ContainsKey($k)) { throw "Invalid CVSS v4.0 string format" }
+        if ($v -notin $VALID_VALUES[$k]) { throw "Invalid CVSS v4.0 string format" }
         $metrics[$k] = $v
     }
     foreach ($m in $MANDATORY_METRICS) {
-        if (-not $metrics.ContainsKey($m)) { throw "Missing mandatory metric '$m'" }
+        if (-not $metrics.ContainsKey($m)) { throw "Invalid CVSS v4.0 string format" }
     }
     return $metrics
 }

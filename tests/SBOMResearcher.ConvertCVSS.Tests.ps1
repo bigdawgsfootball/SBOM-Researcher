@@ -77,19 +77,19 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
 
         # Assert
-        $actualBaseScore | Should -Be $expectedBaseScore
+        $actualBaseScore[1] | Should -Be $expectedBaseScore
     }
 
     It "returns the correct base score for a HIGH severity CVSS v4.0 string" {
         # Arrange
         $CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:L/VA:N/SC:L/SI:L/SA:N"
-        $expectedBaseScore = 8.8
+        $expectedBaseScore[1] = 8.8
 
         # Act
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
 
         # Assert
-        $actualBaseScore | Should -Be $expectedBaseScore
+        $actualBaseScore[1] | Should -Be $expectedBaseScore
     }
 
     It "returns the correct base score for a MEDIUM severity CVSS v4.0 string" {
@@ -101,7 +101,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
 
         # Assert
-        $actualBaseScore | Should -Be $expectedBaseScore
+        $actualBaseScore[1] | Should -Be $expectedBaseScore
     }
 
     It "returns the correct base score for a LOW severity CVSS v4.0 string" {
@@ -113,7 +113,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
 
         # Assert
-        $actualBaseScore | Should -Be $expectedBaseScore
+        $actualBaseScore[1] | Should -Be $expectedBaseScore
     }
 
     It "returns the correct base score for additional examples" -TestCases @(
@@ -126,7 +126,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
         @{ CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N"; ExpectedBaseScore = 7.1 }
     ) {
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
-        $actualBaseScore | Should -Be $ExpectedBaseScore
+        $actualBaseScore[1] | Should -Be $ExpectedBaseScore
     }
 
     It "throws an error for an invalid CVSS v4.0 string" {
