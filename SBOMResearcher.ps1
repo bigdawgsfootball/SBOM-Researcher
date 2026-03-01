@@ -96,6 +96,7 @@ function Convert-CVSS3StringToBaseScore {
 # wrapper providing simple numeric interface and throws on invalid vectors
 function Convert-CVSS4StringToBaseScore {
     [CmdletBinding()]
+    [OutputType([double])]
     param(
         [Parameter(Mandatory=$true)]
         [string]$CVSSString
