@@ -589,7 +589,6 @@ function Invoke-CVSSScore {
             Vector      = $Vec
             Error       = "$_"
         }
-        throw "Invalid CVSS v4.0 string format"
     }
 }
 

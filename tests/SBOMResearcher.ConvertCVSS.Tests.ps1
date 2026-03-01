@@ -134,10 +134,12 @@ Describe "Convert-CVSS4StringToBaseScore" {
         $CVSSString = "CVSS:4.0/AV:X/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N" # Invalid CVSS string
 
         # Act
-        $scriptBlock = { Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString }
+        #$scriptBlock = { Convert-CVSS4StringToBaseScore -Vectors $CVSSString }
+        $result = Convert-CVSS4StringToBaseScore -Vectors $CVSSString
 
         # Assert
-        $scriptBlock | Should -Throw -ExpectedMessage "Invalid CVSS v4.0 string format"
+        #$scriptBlock | Should -Throw -ExpectedMessage "Invalid CVSS v4.0 string format"
+        $result.Error | Should -Match "Invalid CVSS v4.0 string format"
     }
 
 }
