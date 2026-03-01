@@ -352,7 +352,7 @@ function Get-M {
 # ---------------------------------------------------------------------------
 # Helper: expand all metrics so optional ones have defaults
 # ---------------------------------------------------------------------------
-function Expand-Metrics {
+function expand-metric {
     param([hashtable]$Metrics)
     $exp = @{} + $Metrics
     foreach ($abbr in "MAV","MAC","MAT","MPR","MUI","MVC","MVI","MVA","MSC","MSI","MSA") {
@@ -570,7 +570,7 @@ function Invoke-CVSSScore {
     param([string]$Vec)
     try {
         $parsed   = ConvertFrom-Vector $Vec
-        $expanded = Expand-Metrics $parsed
+        $expanded = expand-metric $parsed
         $macro    = Get-MacroVector $expanded
         $score    = Get-CVSSScore $expanded
         $severity = Get-Severity $score
@@ -840,7 +840,7 @@ function Test-PurlFormat {
         return $true
     } else {
         return $false
-    }   
+    }
 }
 
 function Get-VersionFromPurl {
@@ -1125,7 +1125,7 @@ function Get-SBOMType {
 
 function Get-CycloneDXComponentList {
     [CmdletBinding()]
-    [OutputType([string])]
+    [OutputType([System.Collections.Generic.List[PSObject]])]
     param(
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
         [Parameter(Mandatory=$true)][PSObject]$allLicenses,
@@ -1206,7 +1206,7 @@ function Get-CycloneDXComponentList {
 
 function Get-SPDXComponentList {
     [CmdletBinding()]
-    [OutputType([string])]
+    [OutputType([System.Collections.Generic.List[PSObject]])]
     param(
         [Parameter(Mandatory=$true)][PSObject]$SBOM,
         [Parameter(Mandatory=$true)][PSObject]$allLicenses,

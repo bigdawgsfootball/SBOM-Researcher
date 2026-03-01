@@ -13,5 +13,5 @@ currently being supported with security updates.
 ## Reporting a Vulnerability
 
 If you believe that there is a security vulnerability in this code, please
-submit an issue. Include as much detail as you can,
-and I will review and address as quickly as possible.
+submit an issue at https://github.com/bigdawgsfootball/SBOM-Researcher/issues.
+Include as much detail as you can, and I will review and address as quickly as possible.
