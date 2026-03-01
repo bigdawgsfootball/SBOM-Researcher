@@ -83,7 +83,7 @@ Describe "Convert-CVSS4StringToBaseScore" {
     It "returns the correct base score for a HIGH severity CVSS v4.0 string" {
         # Arrange
         $CVSSString = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:L/VA:N/SC:L/SI:L/SA:N"
-        $expectedBaseScore[1] = 8.8
+        $expectedBaseScore = 8.8
 
         # Act
         $actualBaseScore = Convert-CVSS4StringToBaseScore -CVSSVector $CVSSString
