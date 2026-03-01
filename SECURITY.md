@@ -2,16 +2,26 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Only the latest version is supported. Users should always use the current release.
 
-| Version | Supported          |
+| Version | Status             |
 | ------- | ------------------ |
-| 1.1     | :white_check_mark: |
+| Latest  | :white_check_mark: |
+| Older   | ❌ Unsupported     |
 
+## Getting the Latest Version
+
+- **GitHub Releases**: Download from [the latest release](https://github.com/bigdawgsfootball/SBOM-Researcher/releases/latest)
+- Always use the most recent version available
 
 ## Reporting a Vulnerability
 
-If you believe that there is a security vulnerability in this code, please
-submit an issue at https://github.com/bigdawgsfootball/SBOM-Researcher/issues.
-Include as much detail as you can, and I will review and address as quickly as possible.
+If you believe that there is a security vulnerability in this code:
+
+1. **DO NOT** open a public issue on GitHub
+2. Please email me (bigdawgsfootball@gmail.com) with security details
+3. Include as much detail as you can:
+   - Description of the vulnerability
+   - Steps to reproduce
+   - Potential impact
+4. I will review and address as quickly as possible
