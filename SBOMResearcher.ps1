@@ -93,10 +93,29 @@ function Convert-CVSS3StringToBaseScore {
     return $BaseScoreFinal
 }
 
+# wrapper providing simple numeric interface and throws on invalid vectors
 function Convert-CVSS4StringToBaseScore {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$CVSSString
+    )
+
+    # delegate to the complex implementation; it returns a PSCustomObject with Score and Error
+    $result = Convert-CVSS4StringToBaseScoreImpl -Vectors $CVSSString
+
+    if ($result.Error) {
+        # normalize to the expected message (error details may include extra context)
+        throw "Invalid CVSS v4.0 string format"
+    }
+    # Score property is formatted as a string; convert to double for consistency with CVSS3
+    return [double]$result.Score
+}
+
+function Convert-CVSS4StringToBaseScoreImpl {
 <#
 .SYNOPSIS
-    Calculates a CVSS v4.0 score from a vector string.
+    Calculates a CVSS v4.0 score from a vector string (internal; returns detailed object or handles multiple vectors).
 
 .DESCRIPTION
     Parses a CVSS v4.0 vector string and computes the numeric score and severity rating.
@@ -105,8 +124,9 @@ function Convert-CVSS4StringToBaseScore {
     of https://github.com/RedHatProductSecurity/cvss-v4-calculator).
 
 .PARAMETER Vector
-    A CVSS v4.0 vector string, e.g.:
-    "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"
+    One or more CVSS v4.0 vector strings (passed via -Vectors). Accepts multiple
+    entries, returns detailed PSCustomObject records with Score, Severity, MacroVector,
+    etc.
 
 .EXAMPLE
     .\CVSSv4Calc.ps1 "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"
@@ -595,21 +615,18 @@ function Invoke-CVSSScore {
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
-if ($Vectors -and $Vectors.Count -gt 0) {
+if ($Vectors -and @($Vectors).Count -gt 0) {
     # ---- One or more vectors passed as arguments ----
     $results = $Vectors | ForEach-Object { Invoke-CVSSScore $_ }
 
-    if ($results.Count -eq 1 -and -not $results[0].Error) {
-        $r = $results[0]
-        return $r
-        #write-output ("Score: {0}  Severity: {1}  MacroVector: {2}" -f $r.Score, $r.Severity, $r.MacroVector)
+
+    if (@($results).Count -eq 1) {
+        # always return the single result object (even if it contains an error)
+        return $results[0]
     } else {
-        #$results | Format-Table -AutoSize -Property Score, Severity, MacroVector, Vector, Error
+        # multiple rows: return just the scores (legacy behaviour)
         return $results.Score
     }
-
-    # Exit with error code if any rows have errors
-    if ($results | Where-Object { $_.Error }) { exit 1 }
 
 } else {
     # ---- Interactive mode ----

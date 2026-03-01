@@ -24,7 +24,7 @@ All of the above information will be contained in the _ProjectName__report.txt o
 Has been tested reasonably so far against CycloneDX and SPDX formated SBOMs.
 Your SBOMPath may include a mix of CycloneDX and SPDX SBOMs.
 
-CVSS v4.0, v3.0 and 3.1 are supported completely and validated against the FIRST.org calculator.
+CVSS v4.0, v3.0 and 3.1 are supported completely and validated against the FIRST.org calculator. Both the 3.x and 4.0 conversion functions behave consistently by throwing on invalid vectors.
 
 ## Usage
 SBOMResearcher -SBOMPath "_{Path to SBOM File or Directory}_" -wrkDir
