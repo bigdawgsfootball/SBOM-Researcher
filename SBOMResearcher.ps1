@@ -913,7 +913,10 @@ function Get-OSVQueryResult {
     }
 
     $batchSize = 1000
+    $totalBatches = [Math]::Ceiling($Purls.Count / $batchSize)
+    $batchNumber = 0
     for ($start = 0; $start -lt $Purls.Count; $start += $batchSize) {
+        $batchNumber++
         $batchCount = [Math]::Min($batchSize, $Purls.Count - $start)
         $activeQueries = [System.Collections.Generic.List[object]]::new()
         for ($offset = 0; $offset -lt $batchCount; $offset++) {
@@ -923,7 +926,11 @@ function Get-OSVQueryResult {
             })
         }
 
+        $pageNumber = 0
         while ($activeQueries.Count -gt 0) {
+            $pageNumber++
+            Write-Progress -Id 0 -Activity "OSV scan" -Status "Query batch $batchNumber of $totalBatches; page $pageNumber; $($activeQueries.Count) package queries" -PercentComplete ([Math]::Floor(($start / $Purls.Count) * 100))
+
             $queries = @(
                 foreach ($activeQuery in $activeQueries) {
                     $purl = $Purls[$activeQuery.ResultIndex].purl.replace(":cargo/", ":crates.io/")
@@ -975,6 +982,8 @@ function Get-OSVQueryResult {
             }
             $activeQueries = $nextActiveQueries
         }
+
+        Write-Progress -Id 0 -Activity "OSV scan" -Status "Package queries: $($start + $batchCount) of $($Purls.Count) complete" -PercentComplete ([Math]::Floor((($start + $batchCount) / $Purls.Count) * 100))
     }
 
     return $queryResults.ToArray()
@@ -988,7 +997,12 @@ function Get-OSVVulnerabilityDetail {
     )
 
     $vulnerabilitiesById = @{}
-    foreach ($id in ($VulnerabilityIds | Select-Object -Unique)) {
+    $uniqueIds = @($VulnerabilityIds | Select-Object -Unique)
+    $index = 0
+    foreach ($id in $uniqueIds) {
+        $index++
+        Write-Progress -Id 0 -Activity "OSV scan" -Status "Fetching vulnerability details: $index of $($uniqueIds.Count)" -PercentComplete ([Math]::Floor((($index - 1) / $uniqueIds.Count) * 100))
+
         $escapedId = [System.Uri]::EscapeDataString($id)
         try {
             $response = Invoke-WebRequest -Uri "https://api.osv.dev/v1/vulns/$escapedId" -Method GET -UseBasicParsing
@@ -1001,6 +1015,12 @@ function Get-OSVVulnerabilityDetail {
         } catch {
             throw "OSV returned invalid vulnerability details for '$id': $($_.Exception.Message)"
         }
+    }
+
+    if ($uniqueIds.Count -gt 0) {
+        Write-Progress -Id 0 -Activity "OSV scan" -Status "Fetched vulnerability details: $($uniqueIds.Count) of $($uniqueIds.Count)" -PercentComplete 100
+    } else {
+        Write-Progress -Id 0 -Activity "OSV scan" -Status "No vulnerability details to fetch" -PercentComplete 100
     }
 
     return $vulnerabilitiesById
@@ -1037,9 +1057,9 @@ function Get-VulnList {
 
         $index++
         if ($null -ne $purls.count) {
-        Write-Progress -Activity "Querying OSV for all purls" -Status "$index of $($purls.count) processed" -PercentComplete (($index / $purls.count) * 100)
+        Write-Progress -Id 0 -Activity "OSV scan" -Status "Processing components: $index of $($purls.count)" -PercentComplete (($index / $purls.count) * 100)
         } else {
-            Write-Progress -Activity "Querying OSV for all purls" -Status "$index of 1 processed" -PercentComplete (100)
+            Write-Progress -Id 0 -Activity "OSV scan" -Status "Processing components: $index of 1" -PercentComplete 100
         }
 
         $queryResult = $batchResults[$index - 1]
@@ -1216,6 +1236,7 @@ function Get-VulnList {
                         }
                     }
                 }
+
             }
         } else {
             if ($ListAll) {
@@ -1223,6 +1244,8 @@ function Get-VulnList {
             }
         }
     }
+
+    Write-Progress -Id 0 -Activity "OSV scan" -Completed
 }
 
 function Get-SBOMType {
@@ -1514,4 +1537,4 @@ function SBOMResearcher {
     }
 }
 
-#SBOMResearcher -SBOMPath "C:\Temp\sbom_test\" -ProjectName "Testing" -wrkDir "C:\Temp\sbom_test\reports" -PrintLicenseInfo $true -minScore 7.0
+SBOMResearcher -SBOMPath "C:\Temp\sbom_test\" -ProjectName "Testing" -wrkDir "C:\Temp\sbom_test\reports" -PrintLicenseInfo $true -minScore 7.0

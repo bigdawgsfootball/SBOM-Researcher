@@ -5,6 +5,7 @@ BeforeAll {
 Describe 'Get-OSVQueryResult' {
     BeforeEach {
         $script:batchRequestCount = 0
+        Mock Write-Progress {}
     }
 
     It 'preserves query ordering and paginates only results with a page token' {
@@ -83,6 +84,10 @@ Describe 'Get-OSVQueryResult' {
 }
 
 Describe 'Get-OSVVulnerabilityDetail' {
+    BeforeEach {
+        Mock Write-Progress {}
+    }
+
     It 'fetches each distinct vulnerability ID once' {
         $requestedIds = [System.Collections.Generic.List[string]]::new()
 
