@@ -14,6 +14,10 @@ managed by Google. It will then report back with the list of vulnerabilities
 published for each package, and will provide a link to a page detailing the
 CVSS score for each vulnerability if the CVSS score was provided.
 
+Package lookups use OSV's batch query API. Full vulnerability records are then
+retrieved by ID so the existing report can include descriptions, severity, and
+fixed-version information.
+
 Each vulnerability in the report will list the Component Name and Version, and a list containing Vulnerability Name, Vulnerability Database Source, Summary, Details, Fixed Version if available, a link to a CVSS Score visualizer, a calculated CVSS Score, a breakdown of each CVSS Score components, a calculation of the CVSS Score severity, and any liscense info if the -PrintLicenseInfo parameter was $true for each vulnerability found of the component that exceeded the -minScore parameter.
 
 A rollup summary for each component in the report will indicate if there is a Version you could upgrade to that will address all vulnerabilities.

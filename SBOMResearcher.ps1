@@ -898,6 +898,114 @@ function Get-NameFromPurl {
     }
 }
 
+function Get-OSVQueryResult {
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][object[]]$Purls
+    )
+
+    $queryResults = [System.Collections.Generic.List[object]]::new()
+    foreach ($purl in $Purls) {
+        $queryResults.Add([PSCustomObject]@{
+            VulnerabilityIds = [System.Collections.ArrayList]::new()
+        })
+    }
+
+    $batchSize = 1000
+    for ($start = 0; $start -lt $Purls.Count; $start += $batchSize) {
+        $batchCount = [Math]::Min($batchSize, $Purls.Count - $start)
+        $activeQueries = [System.Collections.Generic.List[object]]::new()
+        for ($offset = 0; $offset -lt $batchCount; $offset++) {
+            $activeQueries.Add([PSCustomObject]@{
+                ResultIndex = $start + $offset
+                PageToken = $null
+            })
+        }
+
+        while ($activeQueries.Count -gt 0) {
+            $queries = @(
+                foreach ($activeQuery in $activeQueries) {
+                    $purl = $Purls[$activeQuery.ResultIndex].purl.replace(":cargo/", ":crates.io/")
+                    $query = @{
+                        package = @{
+                            purl = $purl
+                        }
+                    }
+                    if (-not [string]::IsNullOrEmpty($activeQuery.PageToken)) {
+                        $query.page_token = $activeQuery.PageToken
+                    }
+                    $query
+                }
+            )
+
+            $body = @{ queries = $queries } | ConvertTo-Json -Depth 5 -Compress
+            try {
+                $response = Invoke-WebRequest -Uri "https://api.osv.dev/v1/querybatch" -Method POST -Body $body -UseBasicParsing -ContentType 'application/json'
+            } catch {
+                throw "OSV batch query failed for components starting at index $($start + 1): $($_.Exception.Message)"
+            }
+
+            try {
+                $batchResponse = $response.Content | ConvertFrom-Json
+            } catch {
+                throw "OSV batch query returned invalid JSON for components starting at index $($start + 1): $($_.Exception.Message)"
+            }
+
+            $results = @($batchResponse.results)
+            if ($results.Count -ne $activeQueries.Count) {
+                throw "OSV batch query returned $($results.Count) results for $($activeQueries.Count) queries."
+            }
+
+            $nextActiveQueries = [System.Collections.Generic.List[object]]::new()
+            for ($resultIndex = 0; $resultIndex -lt $results.Count; $resultIndex++) {
+                $queryResult = $queryResults[$activeQueries[$resultIndex].ResultIndex]
+                foreach ($vulnerability in @($results[$resultIndex].vulns)) {
+                    if (($null -ne $vulnerability.id) -and ($vulnerability.id -notin $queryResult.VulnerabilityIds)) {
+                        $queryResult.VulnerabilityIds.Add($vulnerability.id) | Out-Null
+                    }
+                }
+
+                if (-not [string]::IsNullOrEmpty($results[$resultIndex].next_page_token)) {
+                    $nextActiveQueries.Add([PSCustomObject]@{
+                        ResultIndex = $activeQueries[$resultIndex].ResultIndex
+                        PageToken = $results[$resultIndex].next_page_token
+                    })
+                }
+            }
+            $activeQueries = $nextActiveQueries
+        }
+    }
+
+    return $queryResults.ToArray()
+}
+
+function Get-OSVVulnerabilityDetail {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][string[]]$VulnerabilityIds
+    )
+
+    $vulnerabilitiesById = @{}
+    foreach ($id in ($VulnerabilityIds | Select-Object -Unique)) {
+        $escapedId = [System.Uri]::EscapeDataString($id)
+        try {
+            $response = Invoke-WebRequest -Uri "https://api.osv.dev/v1/vulns/$escapedId" -Method GET -UseBasicParsing
+        } catch {
+            throw "OSV vulnerability detail request failed for '$id': $($_.Exception.Message)"
+        }
+
+        try {
+            $vulnerabilitiesById[$id] = $response.Content | ConvertFrom-Json
+        } catch {
+            throw "OSV returned invalid vulnerability details for '$id': $($_.Exception.Message)"
+        }
+    }
+
+    return $vulnerabilitiesById
+}
+
 function Get-VulnList {
     [CmdletBinding()]
     param(
@@ -912,6 +1020,16 @@ function Get-VulnList {
     # for each vulnerability, it will collect the summary, deatils, vuln id, fixed version, link to CVSS score calculator, and license info
     # at the end of the component, as well as the recommended upgrade version if all vulnerabilities have been addressed in upgrades
 
+    $batchResults = @(Get-OSVQueryResult -Purls $purls)
+    $vulnerabilityIds = @(
+        foreach ($queryResult in $batchResults) {
+            foreach ($id in $queryResult.VulnerabilityIds) {
+                $id
+            }
+        }
+    )
+    $vulnerabilityDetails = Get-OSVVulnerabilityDetail -VulnerabilityIds $vulnerabilityIds
+
     $index = 0
     $validVuln = 0
     foreach ($purl in $purls) {
@@ -924,27 +1042,8 @@ function Get-VulnList {
             Write-Progress -Activity "Querying OSV for all purls" -Status "$index of 1 processed" -PercentComplete (100)
         }
 
-        # Build the JSON body for the OSV API query
-        # noticed that OSV.dev records cargo package type as crates.io, need to handle that here on query
-        try {
-                $body = @{
-                    "package" = @{
-                        "purl" = $purl.purl.replace(":cargo/",":crates.io/")
-                    }
-                } | ConvertTo-Json
-            } catch {
-                write-output "Error constructing OSV.dev query body from purl $($purl) at index $($index): $($_.Exception.Message)"
-            }
-
-        # Invoke the OSV API with the JSON body and save the response
-        try {
-            $response = Invoke-WebRequest -uri "https://api.osv.dev/v1/query" -Method POST -Body $body -UseBasicParsing -ContentType 'application/json'
-        } catch {
-            Write-Output "OSV search for $($purl.purl) returned an error: $($_.Exception.Message)"
-        }
-
-        # Check if the response has any vulnerabilities
-        if ($response.Content.length -gt 2) {
+        $queryResult = $batchResults[$index - 1]
+        if ($queryResult.VulnerabilityIds.Count -gt 0) {
             $name = Get-NameFromPurl($purl.purl)
             $version = Get-VersionFromPurl($purl.purl)
 
@@ -957,10 +1056,12 @@ function Get-VulnList {
                 Vulns = [System.Collections.ArrayList]@()
             }
 
-            $vulns = $response.Content | ConvertFrom-Json
+            $vulns = foreach ($id in $queryResult.VulnerabilityIds) {
+                $vulnerabilityDetails[$id]
+            }
 
             # Loop through each vulnerability in the response
-            foreach ($vulnerability in $vulns.vulns) {
+            foreach ($vulnerability in $vulns) {
 
                 # build new object to store all properties
                 $vuln = [PSCustomObject]@{
