@@ -1898,4 +1898,4 @@ function SBOMResearcher {
     }
 }
 
-SBOMResearcher -SBOMPath "C:\Temp\sbom_test\" -ProjectName "Testing" -wrkDir "C:\Temp\sbom_test\reports" -EPSSWarningThreshold 0.3 -PrintLicenseInfo $true -minScore 7.0
+#SBOMResearcher -SBOMPath "C:\Temp\sbom_test\" -ProjectName "Testing" -wrkDir "C:\Temp\sbom_test\reports" -EPSSWarningThreshold 0.3 -PrintLicenseInfo $true -minScore 7.0
