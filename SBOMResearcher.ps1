@@ -1189,7 +1189,7 @@ function Get-CVEExploitationSignal {
     return $signalsByCVE
 }
 
-function Get-CVSSVectorMetrics {
+function Get-CVSSVectorMetric {
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(
@@ -1406,7 +1406,7 @@ function Get-VulnList {
                 #build uri string to display calculated score and impacted areas
                 if ($vulnerability | Get-Member "Severity") {
                     $CVSSSevScore = $vulnerability.severity[0].score
-                    $cvssMetrics = Get-CVSSVectorMetrics -Vector $CVSSSevScore
+                    $cvssMetrics = Get-CVSSVectorMetric -Vector $CVSSSevScore
                     foreach ($metric in $cvssMetrics.PSObject.Properties) {
                         $vuln.($metric.Name) = $metric.Value
                     }
