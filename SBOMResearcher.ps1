@@ -901,6 +901,119 @@ function Get-NameFromPurl {
     }
 }
 
+function Get-PurlInfo {
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyString()][string]$Purl
+    )
+
+    $invalidResult = {
+        param($reason)
+        [PSCustomObject]@{
+            IsValid = $false
+            Reason = $reason
+            Name = ''
+            Version = ''
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Purl)) {
+        return (& $invalidResult 'PURL is empty.')
+    }
+    if ($Purl.Length -gt 4096) {
+        return (& $invalidResult 'PURL exceeds the 4096-character validation limit.')
+    }
+    if ($Purl -match '[\s\x00-\x1F\x7F]') {
+        return (& $invalidResult 'PURL contains whitespace or control characters.')
+    }
+    if ($Purl -notmatch '^pkg:') {
+        return (& $invalidResult "PURL must start with 'pkg:'.")
+    }
+    if ($Purl -match '%(?![0-9A-Fa-f]{2})') {
+        return (& $invalidResult 'PURL contains an invalid percent-encoding.')
+    }
+
+    $body = $Purl.Substring(4)
+    $fragmentIndex = $body.IndexOf('#')
+    if ($fragmentIndex -ge 0) {
+        $subpath = $body.Substring($fragmentIndex + 1)
+        if ([string]::IsNullOrEmpty($subpath) -or $subpath.StartsWith('/') -or $subpath.EndsWith('/') -or $subpath.Contains('//')) {
+            return (& $invalidResult 'PURL subpath is empty or contains an empty path segment.')
+        }
+        $body = $body.Substring(0, $fragmentIndex)
+    }
+
+    $queryIndex = $body.IndexOf('?')
+    if ($queryIndex -ge 0) {
+        $qualifiers = $body.Substring($queryIndex + 1)
+        if ([string]::IsNullOrEmpty($qualifiers)) {
+            return (& $invalidResult 'PURL qualifier section is empty.')
+        }
+        foreach ($qualifier in $qualifiers.Split('&')) {
+            $separatorIndex = $qualifier.IndexOf('=')
+            if (($separatorIndex -le 0) -or ($separatorIndex -eq ($qualifier.Length - 1))) {
+                return (& $invalidResult 'PURL qualifiers must have non-empty keys and values.')
+            }
+        }
+        $body = $body.Substring(0, $queryIndex)
+    }
+
+    $slashIndex = $body.IndexOf('/')
+    if (($slashIndex -le 0) -or ($slashIndex -eq ($body.Length - 1))) {
+        return (& $invalidResult 'PURL must include a package type and non-empty package path.')
+    }
+
+    $packageType = $body.Substring(0, $slashIndex)
+    if ($packageType -cnotmatch '^[a-z][a-z0-9.+-]*$') {
+        return (& $invalidResult 'PURL package type is malformed.')
+    }
+
+    $packagePath = $body.Substring($slashIndex + 1)
+    $version = ''
+    $versionIndex = $packagePath.LastIndexOf('@')
+    if ($versionIndex -ge 0) {
+        if (($versionIndex -eq 0) -or ($versionIndex -eq ($packagePath.Length - 1))) {
+            return (& $invalidResult 'PURL version separator requires a package name and non-empty version.')
+        }
+        $version = $packagePath.Substring($versionIndex + 1)
+        $packagePath = $packagePath.Substring(0, $versionIndex)
+    }
+
+    if ($packagePath.Contains('@')) {
+        return (& $invalidResult 'PURL package path contains an unescaped version separator.')
+    }
+    if ($packagePath.StartsWith('/') -or $packagePath.EndsWith('/') -or $packagePath.Contains('//')) {
+        return (& $invalidResult 'PURL package path contains an empty segment.')
+    }
+    if ($packagePath -match '[?#]') {
+        return (& $invalidResult 'PURL package path contains an unescaped query or fragment delimiter.')
+    }
+
+    $segments = $packagePath.Split('/')
+    foreach ($segment in $segments) {
+        if ([string]::IsNullOrEmpty($segment)) {
+            return (& $invalidResult 'PURL package path contains an empty segment.')
+        }
+    }
+
+    try {
+        $name = [System.Uri]::UnescapeDataString($segments[$segments.Count - 1])
+    } catch {
+        return (& $invalidResult 'PURL package name could not be decoded.')
+    }
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        return (& $invalidResult 'PURL package name is empty.')
+    }
+
+    return [PSCustomObject]@{
+        IsValid = $true
+        Reason = ''
+        Name = $name
+        Version = $version
+    }
+}
+
 function Get-OSVQueryResult {
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -1563,17 +1676,23 @@ function Get-CycloneDXComponentList {
 
         if ($type -eq "library" -or $type -eq "framework") {
             # Get the component purl
-            if ($package.purl -notin $allpurls) {
+            $purlString = [string]$package.purl
+            $purlInfo = Get-PurlInfo -Purl $purlString
+            if (-not $purlInfo.IsValid) {
+                Write-Warning "Skipping invalid PURL '$purlString' in SBOM '$file': $($purlInfo.Reason)"
+                continue
+            }
+            if ($purlString -notin $allpurls) {
                 $componentLicense = if ($packageLicenseIds.Count -gt 0) { $packageLicenseIds -join '; ' } else { "NOASSERTION" }
                 $packageInfo = [PSCustomObject]@{
-                    "purl" = $package.purl
+                    "purl" = $purlString
                     "license" = $componentLicense
                 }
 
                 $purlList.Add($packageInfo)
                 $loc = [PSCustomObject]@{
-                    "component" = Get-NameFromPurl -purl $package.purl;
-                    "version" = Get-VersionFromPurl -purl $package.purl;
+                    "component" = $purlInfo.Name;
+                    "version" = if ([string]::IsNullOrEmpty($purlInfo.Version)) { [string]$package.version } else { $purlInfo.Version };
                     "file" = $file
                   }
                 $componentLocations.value.Add($loc) | Out-Null
@@ -1636,50 +1755,27 @@ function Get-SPDXComponentList {
             $useLicense = "NOASSERTION"
         }
 
-        if (($package.externalRefs.referenceLocator -ne "") -and ($null -ne $package.externalRefs.referenceLocator)) {
-            $referenceLocator = $package.externalRefs.referenceLocator
-            $purlString = $referenceLocator
-            $testVersion = Get-VersionFromPurl -purl $referenceLocator
-            if ($testVersion -eq "") {
-                #$testVersion = ($package.versioninfo).trimstart('^', '>', '<', '=', ' ')
-                $rangePattern = '(?<=\>|\>=)\d+(\.\d+){0,2}'
-
-                $testVersion = [regex]::Match(($package.versionInfo -replace " ",""), $rangePattern).Value
-        }
-
-            if ($testVersion -ne "") {
-                $components = $testVersion.Split('.')
-
-                while ($components.count -lt 3) {
-                    $testversion += ".0"
-                    $components = $testVersion.Split('.')
-                }
-            }
-
-            $testName = Get-NameFromPurl -purl $package.externalRefs.referenceLocator
-            if ($testName -eq "") {
-                #encountered some differences in the SPDX purl formats, need to handle those here
-                $testName = $package.externalRefs.referenceLocator
-                $purlString = $testName + "@" + $testVersion
-            } else {
-                $purlString = $referenceLocator
-            }
-        } else {
-            $testName = ""
-            $testVersion = ""
-        }
-
         if (($useLicense -ne "NOASSERTION") -and ($null -ne $useLicense) -and ($useLicense -notin $allLicenses)) {
             $allLicenses.Add($useLicense) | Out-Null
         }
 
-        foreach ($refType in $package.externalRefs) {
+        foreach ($refType in @($package.externalRefs)) {
             if ($refType.referenceType -eq "purl") {
-                # Get the component purl
-                if ($refType.referenceLocator -notin $allpurls) {
-                    #$purlList += $refType.referenceLocator
+                $referenceLocator = [string]$refType.referenceLocator
+                $purlInfo = Get-PurlInfo -Purl $referenceLocator
+                if (-not $purlInfo.IsValid) {
+                    Write-Warning "Skipping invalid PURL '$referenceLocator' in SBOM '$file': $($purlInfo.Reason)"
+                    continue
+                }
+
+                if ($referenceLocator -notin $allpurls) {
+                    $testVersion = $purlInfo.Version
+                    if ([string]::IsNullOrEmpty($testVersion)) {
+                        $testVersion = [string]$package.versionInfo
+                    }
+                    $testName = $purlInfo.Name
                     $packageInfo = [PSCustomObject]@{
-                        "purl" = $purlString
+                        "purl" = $referenceLocator
                         "license" = $useLicense
                     }
                     $purlList.Add($packageInfo)
@@ -1802,4 +1898,4 @@ function SBOMResearcher {
     }
 }
 
-#SBOMResearcher -SBOMPath "C:\Temp\sbom_test\" -ProjectName "Testing" -wrkDir "C:\Temp\sbom_test\reports" -EPSSWarningThreshold 0.3 -PrintLicenseInfo $true -minScore 7.0
+SBOMResearcher -SBOMPath "C:\Temp\sbom_test\" -ProjectName "Testing" -wrkDir "C:\Temp\sbom_test\reports" -EPSSWarningThreshold 0.3 -PrintLicenseInfo $true -minScore 7.0

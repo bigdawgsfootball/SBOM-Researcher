@@ -145,6 +145,49 @@ Describe 'Get-CVEIdsForVulnerability' {
     }
 }
 
+Describe 'Get-PurlInfo' {
+    It 'accepts short versions, namespaces, qualifiers, subpaths, and encoded package names' {
+        $info = Get-PurlInfo -Purl 'pkg:githubactions/conda-incubator/setup-miniconda@2?arch=x86_64#actions/setup'
+        $encodedInfo = Get-PurlInfo -Purl 'pkg:npm/%40scope/package@1.2.3'
+
+        $info.IsValid | Should -BeTrue
+        $info.Name | Should -Be 'setup-miniconda'
+        $info.Version | Should -Be '2'
+        $encodedInfo.IsValid | Should -BeTrue
+        $encodedInfo.Name | Should -Be 'package'
+        $encodedInfo.Version | Should -Be '1.2.3'
+    }
+
+    It 'rejects malformed structure and percent-encoding with a reason' {
+        $invalidPurls = @(
+            'https://example.com/package'
+            'pkg:npm/'
+            'pkg:npm/package@'
+            'pkg:npm/package%2@1.0.0'
+            'pkg:npm/package?arch='
+            "pkg:npm/package@1.0.0`n"
+        )
+
+        foreach ($purl in $invalidPurls) {
+            $info = Get-PurlInfo -Purl $purl
+            $info.IsValid | Should -BeFalse -Because $purl
+            [string]::IsNullOrWhiteSpace($info.Reason) | Should -BeFalse
+        }
+    }
+
+    It 'rejects overly long PURLs without doing expensive pattern matching' {
+        $purl = 'pkg:npm/' + ('a' * 5000) + '@1.0.0'
+        $timer = [System.Diagnostics.Stopwatch]::StartNew()
+
+        $info = Get-PurlInfo -Purl $purl
+
+        $timer.Stop()
+        $info.IsValid | Should -BeFalse
+        $info.Reason | Should -Match '4096-character'
+        $timer.ElapsedMilliseconds | Should -BeLessThan 1000
+    }
+}
+
 Describe 'Get-CVEExploitationSignal' {
     BeforeEach {
         Mock Write-Progress {}
@@ -373,6 +416,26 @@ Describe 'SBOM component extraction progress' {
         Should -Invoke Write-Progress -Times 2 -ParameterFilter { $Id -eq 1 -and $Activity -eq 'Extracting CycloneDX components' }
     }
 
+    It 'skips malformed CycloneDX PURLs with a warning' {
+        Mock Write-Warning {}
+        $componentLocations = [System.Collections.ArrayList]::new()
+        $sbom = [PSCustomObject]@{
+            components = @(
+                [PSCustomObject]@{
+                    type = 'library'
+                    purl = 'pkg:npm/'
+                    licenses = @()
+                }
+            )
+        }
+
+        $licenses = [System.Collections.ArrayList]::new()
+        $components = Get-CycloneDXComponentList -SBOM $sbom -allLicenses $licenses -componentLocations ([ref]$componentLocations)
+
+        $components.Count | Should -Be 0
+        Should -Invoke Write-Warning -Times 1 -ParameterFilter { $Message -like '*Skipping invalid PURL*' }
+    }
+
     It 'reports progress while extracting SPDX components' {
         $componentLocations = [System.Collections.ArrayList]::new()
         $sbom = [PSCustomObject]@{
@@ -433,6 +496,31 @@ Describe 'SBOM component extraction progress' {
         $components[0].purl | Should -Be 'pkg:githubactions/actions/upload-artifact@3'
         $components[1].purl | Should -Be 'pkg:githubactions/conda-incubator/setup-miniconda@2'
         $components[1].license | Should -Be 'NOASSERTION'
+    }
+
+    It 'skips malformed SPDX PURLs with a warning while extracting valid references' {
+        Mock Write-Warning {}
+        $componentLocations = [System.Collections.ArrayList]::new()
+        $licenses = [System.Collections.ArrayList]::new()
+        $sbom = [PSCustomObject]@{
+            packages = @(
+                [PSCustomObject]@{
+                    name = 'invalid-package'
+                    licenseDeclared = 'NOASSERTION'
+                    licenseConcluded = 'NOASSERTION'
+                    externalRefs = @(
+                        [PSCustomObject]@{ referenceType = 'purl'; referenceLocator = 'pkg:npm/' }
+                        [PSCustomObject]@{ referenceType = 'purl'; referenceLocator = 'pkg:npm/valid-package@1' }
+                    )
+                }
+            )
+        }
+
+        $components = Get-SPDXComponentList -SBOM $sbom -allLicenses $licenses -componentLocations ([ref]$componentLocations)
+
+        $components.Count | Should -Be 1
+        $components[0].purl | Should -Be 'pkg:npm/valid-package@1'
+        Should -Invoke Write-Warning -Times 1 -ParameterFilter { $Message -like '*Skipping invalid PURL*PURL must include*' }
     }
 }
 

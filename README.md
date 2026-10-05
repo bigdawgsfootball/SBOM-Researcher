@@ -66,7 +66,10 @@ The parser currently expects CycloneDX package data in `components` and SPDX
 package data in `packages`, with package PURLs available in the formats the
 script recognizes. It does not query OSV for CycloneDX operating-system
 components; their name, version, and description are written to the text
-report. Unsupported CycloneDX component types are noted in the report.
+report. Unsupported CycloneDX component types are noted in the report. SPDX
+package PURLs and CycloneDX library/framework PURLs receive bounded structural
+checks before use; clearly malformed PURLs are warned about and skipped, while
+valid PURLs are sent to OSV unchanged.
 
 ## Usage
 
