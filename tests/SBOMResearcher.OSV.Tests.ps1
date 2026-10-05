@@ -339,6 +339,11 @@ Describe 'PrintVulnerabilities exploitation output' {
         $vulnerability.PSObject.Properties.Name | Should -Not -Contain 'CVEExploitationSignals'
         $vulnerability.PSObject.Properties.Name | Should -Not -Contain 'InCISAKEV'
         $vulnerability.PSObject.Properties.Name | Should -Not -Contain 'EPSS'
+        $vulnerability.PSObject.Properties.Name | Should -Contain 'AT'
+        $vulnerability.PSObject.Properties.Name | Should -Contain 'VC'
+        $vulnerability.PSObject.Properties.Name | Should -Contain 'SC'
+        $vulnerability.PSObject.Properties.Name | Should -Not -Contain 'S'
+        $vulnerability.PSObject.Properties.Name | Should -Not -Contain 'C'
     }
 }
 
@@ -391,6 +396,44 @@ Describe 'SBOM component extraction progress' {
 
         Should -Invoke Write-Progress -Times 2 -ParameterFilter { $Id -eq 1 -and $Activity -eq 'Extracting SPDX components' }
     }
+
+    It 'extracts GitHub Actions PURLs with short versions without a regex stall or stale PURL' {
+        $componentLocations = [System.Collections.ArrayList]::new()
+        $licenses = [System.Collections.ArrayList]::new()
+        $sbom = [PSCustomObject]@{
+            packages = @(
+                [PSCustomObject]@{
+                    licenseDeclared = 'NOASSERTION'
+                    licenseConcluded = 'NOASSERTION'
+                    versionInfo = '3'
+                    externalRefs = @(
+                        [PSCustomObject]@{
+                            referenceType = 'purl'
+                            referenceLocator = 'pkg:githubactions/actions/upload-artifact@3'
+                        }
+                    )
+                }
+                [PSCustomObject]@{
+                    licenseDeclared = 'NOASSERTION'
+                    licenseConcluded = 'NOASSERTION'
+                    versionInfo = '2'
+                    externalRefs = @(
+                        [PSCustomObject]@{
+                            referenceType = 'purl'
+                            referenceLocator = 'pkg:githubactions/conda-incubator/setup-miniconda@2'
+                        }
+                    )
+                }
+            )
+        }
+
+        $components = Get-SPDXComponentList -SBOM $sbom -allLicenses $licenses -componentLocations ([ref]$componentLocations)
+
+        $components.Count | Should -Be 2
+        $components[0].purl | Should -Be 'pkg:githubactions/actions/upload-artifact@3'
+        $components[1].purl | Should -Be 'pkg:githubactions/conda-incubator/setup-miniconda@2'
+        $components[1].license | Should -Be 'NOASSERTION'
+    }
 }
 
 Describe 'CVSS vector output metrics' {
@@ -402,10 +445,10 @@ Describe 'CVSS vector output metrics' {
         $metrics.AT | Should -Be 'P'
         $metrics.VC | Should -Be 'H'
         $metrics.SC | Should -Be 'L'
-        $metrics.S | Should -Be ''
-        $metrics.C | Should -Be ''
-        $metrics.I | Should -Be ''
-        $metrics.A | Should -Be ''
+        $metrics.PSObject.Properties.Name | Should -Not -Contain 'S'
+        $metrics.PSObject.Properties.Name | Should -Not -Contain 'C'
+        $metrics.PSObject.Properties.Name | Should -Not -Contain 'I'
+        $metrics.PSObject.Properties.Name | Should -Not -Contain 'A'
     }
 
     It 'preserves CVSS 3.x scope and CIA mappings' {
@@ -418,6 +461,9 @@ Describe 'CVSS vector output metrics' {
         $metrics.C | Should -Be 'H'
         $metrics.I | Should -Be 'L'
         $metrics.A | Should -Be 'N'
+        $metrics.PSObject.Properties.Name | Should -Not -Contain 'AT'
+        $metrics.PSObject.Properties.Name | Should -Not -Contain 'VC'
+        $metrics.PSObject.Properties.Name | Should -Not -Contain 'SC'
     }
 }
 

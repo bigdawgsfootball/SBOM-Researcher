@@ -118,7 +118,10 @@ The files are written under `-wrkDir` using `-ProjectName` as their prefix:
   and vector metrics, exploitation-priority warnings, and component locations.
 - `<ProjectName>_vulns.json` — vulnerability records grouped by affected
   component. Each finding includes its CVE IDs and the compact
-  `ExploitationPriority` and `ExploitationReasons` fields.
+  `ExploitationPriority` and `ExploitationReasons` fields. CVSS vector
+  properties are version-specific: CVSS 3.x findings contain Scope and C/I/A
+  metrics, while CVSS 4.0 findings contain Attack Requirements and vulnerable/
+  subsequent-system impact metrics.
 - `<ProjectName>_locs.json` — SBOM-file locations for components with reported
   vulnerabilities.
 - `<ProjectName>_license.json` — created when `-PrintLicenseInfo` is enabled for

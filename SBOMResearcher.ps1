@@ -864,23 +864,6 @@ function PrintVulnerabilities {
 
 }
 
-function Test-PurlFormat {
-    param (
-        [string]$purl
-    )
-
-    #$purlRegex = '^pkg:[a-z]+/[a-zA-Z0-9._-]+@[0-9]+\.[0-9]+\.[0-9]+$'
-    $purlDecoded = [System.Web.HttpUtility]::UrlDecode($purl)
-
-    $purlRegex = '^pkg:[a-z0-9-]+/([a-zA-Z0-9._~-]+/?)+@([v0-9]+\.(\*|[0-9]+)\.(\*|[0-9]+)([+-][a-zA-Z0-9._-]+)?)$'
-
-    if ($purlDecoded -match $purlRegex) {
-        return $true
-    } else {
-        return $false
-    }
-}
-
 function Get-VersionFromPurl {
     [CmdletBinding()]
     [OutputType([string])]
@@ -1218,10 +1201,6 @@ function Get-CVSSVectorMetric {
             SC = $metrics['SC']
             SI = $metrics['SI']
             SA = $metrics['SA']
-            S = ''
-            C = ''
-            I = ''
-            A = ''
         }
     }
 
@@ -1229,15 +1208,8 @@ function Get-CVSSVectorMetric {
         CVSSVersion = $version
         AV = $metrics['AV']
         AC = $metrics['AC']
-        AT = ''
         PR = $metrics['PR']
         UI = $metrics['UI']
-        VC = ''
-        VI = ''
-        VA = ''
-        SC = ''
-        SI = ''
-        SA = ''
         S = $metrics['S']
         C = $metrics['C']
         I = $metrics['I']
@@ -1377,21 +1349,6 @@ function Get-VulnList {
                     Source = "OSV"
                     Fixed = ""
                     Score = ""
-                    AV = ""
-                    AC = ""
-                    AT = ""
-                    PR = ""
-                    UI = ""
-                    S = ""
-                    C = ""
-                    I = ""
-                    A = ""
-                    VC = ""
-                    VI = ""
-                    VA = ""
-                    SC = ""
-                    SI = ""
-                    SA = ""
                     CVSSVersion = ""
                     ScoreURI = ""
                     Severity = ""
@@ -1407,8 +1364,11 @@ function Get-VulnList {
                 if ($vulnerability | Get-Member "Severity") {
                     $CVSSSevScore = $vulnerability.severity[0].score
                     $cvssMetrics = Get-CVSSVectorMetric -Vector $CVSSSevScore
+                    $vuln.CVSSVersion = $cvssMetrics.CVSSVersion
                     foreach ($metric in $cvssMetrics.PSObject.Properties) {
-                        $vuln.($metric.Name) = $metric.Value
+                        if ($metric.Name -ne 'CVSSVersion') {
+                            $vuln | Add-Member -MemberType NoteProperty -Name $metric.Name -Value $metric.Value
+                        }
                     }
 
                      $CVSSCount = $vulnerability.severity.score.count
@@ -1677,7 +1637,9 @@ function Get-SPDXComponentList {
         }
 
         if (($package.externalRefs.referenceLocator -ne "") -and ($null -ne $package.externalRefs.referenceLocator)) {
-            $testVersion = Get-VersionFromPurl -purl $package.externalRefs.referenceLocator
+            $referenceLocator = $package.externalRefs.referenceLocator
+            $purlString = $referenceLocator
+            $testVersion = Get-VersionFromPurl -purl $referenceLocator
             if ($testVersion -eq "") {
                 #$testVersion = ($package.versioninfo).trimstart('^', '>', '<', '=', ' ')
                 $rangePattern = '(?<=\>|\>=)\d+(\.\d+){0,2}'
@@ -1700,9 +1662,7 @@ function Get-SPDXComponentList {
                 $testName = $package.externalRefs.referenceLocator
                 $purlString = $testName + "@" + $testVersion
             } else {
-                if (Test-PurlFormat($package.externalRefs.referenceLocator)) {
-                    $purlString = ($package.externalRefs.referenceLocator) #.split("@")[0]
-                }
+                $purlString = $referenceLocator
             }
         } else {
             $testName = ""
