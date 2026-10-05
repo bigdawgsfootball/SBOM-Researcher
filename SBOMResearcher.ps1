@@ -794,6 +794,14 @@ function PrintVulnerabilities {
                 # some vulnerabilities do not return a summary or fixed version
                 Write-Output "Vulnerability: $($vuln.ID)" | Out-File -FilePath $outfile -Append
                 Write-Output "Source: $($vuln.Source)" | Out-File -FilePath $outfile -Append
+                if ($vuln.ExploitationPriority -eq 'ELEVATED') {
+                    Write-Output "!!! ELEVATED EXPLOITATION PRIORITY: $($vuln.ExploitationReasons -join ', ') !!!" | Out-File -FilePath $outfile -Append
+                } else {
+                    Write-Output "Exploitation Priority: $($vuln.ExploitationPriority)" | Out-File -FilePath $outfile -Append
+                }
+                if ($vuln.CVEIds.Count -gt 0) {
+                    Write-Output "CVE IDs: $($vuln.CVEIds -join ', ')" | Out-File -FilePath $outfile -Append
+                }
                 if ($null -ne $($vuln.Summary)) {
                     Write-Output "Summary: $($vuln.Summary)" | Out-File -FilePath $outfile -Append
                 }
@@ -805,14 +813,26 @@ function PrintVulnerabilities {
 
                 if ($vuln.Score -ne "") {
                     write-output "CVSS Breakdown:               $($vuln.Score)" | Out-File -FilePath $outfile -Append
-                    write-output "CVSS Attack Vector:           $($vuln.AV)" | Out-File -FilePath $outfile -Append
-                    write-output "CVSS Attack Complexity:       $($vuln.AC)" | Out-File -FilePath $outfile -Append
-                    write-output "CVSS Privileges Required:     $($vuln.PR)" | Out-File -FilePath $outfile -Append
-                    write-output "CVSS User Interaction:        $($vuln.UI)" | Out-File -FilePath $outfile -Append
-                    write-output "CVSS Scope:                   $($vuln.S)" | Out-File -FilePath $outfile -Append
-                    write-output "CVSS Confidentiality Impact:  $($vuln.C)" | Out-File -FilePath $outfile -Append
-                    write-output "CVSS Integrity Impact:        $($vuln.I)" | Out-File -FilePath $outfile -Append
-                    write-output "CVSS Availability Impact:     $($vuln.A)" | Out-File -FilePath $outfile -Append
+                    if ($vuln.CVSSVersion -eq '4.0') {
+                        Write-Output "CVSS Version:                  4.0" | Out-File -FilePath $outfile -Append
+                        Write-Output "CVSS Attack Vector:            $($vuln.AV)" | Out-File -FilePath $outfile -Append
+                        Write-Output "CVSS Attack Complexity:        $($vuln.AC)" | Out-File -FilePath $outfile -Append
+                        Write-Output "CVSS Attack Requirements:      $($vuln.AT)" | Out-File -FilePath $outfile -Append
+                        Write-Output "CVSS Privileges Required:      $($vuln.PR)" | Out-File -FilePath $outfile -Append
+                        Write-Output "CVSS User Interaction:         $($vuln.UI)" | Out-File -FilePath $outfile -Append
+                        Write-Output "CVSS Vulnerable System C/I/A:  $($vuln.VC) / $($vuln.VI) / $($vuln.VA)" | Out-File -FilePath $outfile -Append
+                        Write-Output "CVSS Subsequent System C/I/A:  $($vuln.SC) / $($vuln.SI) / $($vuln.SA)" | Out-File -FilePath $outfile -Append
+                    } else {
+                        Write-Output "CVSS Version:                  $($vuln.CVSSVersion)" | Out-File -FilePath $outfile -Append
+                        write-output "CVSS Attack Vector:            $($vuln.AV)" | Out-File -FilePath $outfile -Append
+                        write-output "CVSS Attack Complexity:        $($vuln.AC)" | Out-File -FilePath $outfile -Append
+                        write-output "CVSS Privileges Required:      $($vuln.PR)" | Out-File -FilePath $outfile -Append
+                        write-output "CVSS User Interaction:         $($vuln.UI)" | Out-File -FilePath $outfile -Append
+                        write-output "CVSS Scope:                    $($vuln.S)" | Out-File -FilePath $outfile -Append
+                        write-output "CVSS Confidentiality Impact:   $($vuln.C)" | Out-File -FilePath $outfile -Append
+                        write-output "CVSS Integrity Impact:         $($vuln.I)" | Out-File -FilePath $outfile -Append
+                        write-output "CVSS Availability Impact:      $($vuln.A)" | Out-File -FilePath $outfile -Append
+                    }
                     write-output "CVSS Severity:                $($vuln.Severity)" | Out-File -FilePath $outfile -Append
                 } else {
                     write-output "CVSS Breakdown:               CVSS score currently UNASSESSED" | Out-File -FilePath $outfile -Append
@@ -842,23 +862,6 @@ function PrintVulnerabilities {
     $allcomponents | ConvertTo-Json -Depth 10 | Out-File -FilePath $vulnfile
     $componentLocations | ConvertTo-Json -Depth 2 | Out-File -FilePath $locFile
 
-}
-
-function Test-PurlFormat {
-    param (
-        [string]$purl
-    )
-
-    #$purlRegex = '^pkg:[a-z]+/[a-zA-Z0-9._-]+@[0-9]+\.[0-9]+\.[0-9]+$'
-    $purlDecoded = [System.Web.HttpUtility]::UrlDecode($purl)
-
-    $purlRegex = '^pkg:[a-z0-9-]+/([a-zA-Z0-9._~-]+/?)+@([v0-9]+\.(\*|[0-9]+)\.(\*|[0-9]+)([+-][a-zA-Z0-9._-]+)?)$'
-
-    if ($purlDecoded -match $purlRegex) {
-        return $true
-    } else {
-        return $false
-    }
 }
 
 function Get-VersionFromPurl {
@@ -898,6 +901,494 @@ function Get-NameFromPurl {
     }
 }
 
+function Get-PurlInfo {
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyString()][string]$Purl
+    )
+
+    $invalidResult = {
+        param($reason)
+        [PSCustomObject]@{
+            IsValid = $false
+            Reason = $reason
+            Name = ''
+            Version = ''
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($Purl)) {
+        return (& $invalidResult 'PURL is empty.')
+    }
+    if ($Purl.Length -gt 4096) {
+        return (& $invalidResult 'PURL exceeds the 4096-character validation limit.')
+    }
+    if ($Purl -match '[\s\x00-\x1F\x7F]') {
+        return (& $invalidResult 'PURL contains whitespace or control characters.')
+    }
+    if ($Purl -notmatch '^pkg:') {
+        return (& $invalidResult "PURL must start with 'pkg:'.")
+    }
+    if ($Purl -match '%(?![0-9A-Fa-f]{2})') {
+        return (& $invalidResult 'PURL contains an invalid percent-encoding.')
+    }
+
+    $body = $Purl.Substring(4)
+    $fragmentIndex = $body.IndexOf('#')
+    if ($fragmentIndex -ge 0) {
+        $subpath = $body.Substring($fragmentIndex + 1)
+        if ([string]::IsNullOrEmpty($subpath) -or $subpath.StartsWith('/') -or $subpath.EndsWith('/') -or $subpath.Contains('//')) {
+            return (& $invalidResult 'PURL subpath is empty or contains an empty path segment.')
+        }
+        $body = $body.Substring(0, $fragmentIndex)
+    }
+
+    $queryIndex = $body.IndexOf('?')
+    if ($queryIndex -ge 0) {
+        $qualifiers = $body.Substring($queryIndex + 1)
+        if ([string]::IsNullOrEmpty($qualifiers)) {
+            return (& $invalidResult 'PURL qualifier section is empty.')
+        }
+        foreach ($qualifier in $qualifiers.Split('&')) {
+            $separatorIndex = $qualifier.IndexOf('=')
+            if (($separatorIndex -le 0) -or ($separatorIndex -eq ($qualifier.Length - 1))) {
+                return (& $invalidResult 'PURL qualifiers must have non-empty keys and values.')
+            }
+        }
+        $body = $body.Substring(0, $queryIndex)
+    }
+
+    $slashIndex = $body.IndexOf('/')
+    if (($slashIndex -le 0) -or ($slashIndex -eq ($body.Length - 1))) {
+        return (& $invalidResult 'PURL must include a package type and non-empty package path.')
+    }
+
+    $packageType = $body.Substring(0, $slashIndex)
+    if ($packageType -cnotmatch '^[a-z][a-z0-9.+-]*$') {
+        return (& $invalidResult 'PURL package type is malformed.')
+    }
+
+    $packagePath = $body.Substring($slashIndex + 1)
+    $version = ''
+    $versionIndex = $packagePath.LastIndexOf('@')
+    if ($versionIndex -ge 0) {
+        if (($versionIndex -eq 0) -or ($versionIndex -eq ($packagePath.Length - 1))) {
+            return (& $invalidResult 'PURL version separator requires a package name and non-empty version.')
+        }
+        $version = $packagePath.Substring($versionIndex + 1)
+        $packagePath = $packagePath.Substring(0, $versionIndex)
+    }
+
+    if ($packagePath.Contains('@')) {
+        return (& $invalidResult 'PURL package path contains an unescaped version separator.')
+    }
+    if ($packagePath.StartsWith('/') -or $packagePath.EndsWith('/') -or $packagePath.Contains('//')) {
+        return (& $invalidResult 'PURL package path contains an empty segment.')
+    }
+    if ($packagePath -match '[?#]') {
+        return (& $invalidResult 'PURL package path contains an unescaped query or fragment delimiter.')
+    }
+
+    $segments = $packagePath.Split('/')
+    foreach ($segment in $segments) {
+        if ([string]::IsNullOrEmpty($segment)) {
+            return (& $invalidResult 'PURL package path contains an empty segment.')
+        }
+    }
+
+    try {
+        $name = [System.Uri]::UnescapeDataString($segments[$segments.Count - 1])
+    } catch {
+        return (& $invalidResult 'PURL package name could not be decoded.')
+    }
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        return (& $invalidResult 'PURL package name is empty.')
+    }
+
+    return [PSCustomObject]@{
+        IsValid = $true
+        Reason = ''
+        Name = $name
+        Version = $version
+    }
+}
+
+function Get-OSVQueryResult {
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][object[]]$Purls
+    )
+
+    $queryResults = [System.Collections.Generic.List[object]]::new()
+    foreach ($purl in $Purls) {
+        $queryResults.Add([PSCustomObject]@{
+            VulnerabilityIds = [System.Collections.ArrayList]::new()
+        })
+    }
+
+    $batchSize = 1000
+    $totalBatches = [Math]::Ceiling($Purls.Count / $batchSize)
+    $batchNumber = 0
+    for ($start = 0; $start -lt $Purls.Count; $start += $batchSize) {
+        $batchNumber++
+        $batchCount = [Math]::Min($batchSize, $Purls.Count - $start)
+        $activeQueries = [System.Collections.Generic.List[object]]::new()
+        for ($offset = 0; $offset -lt $batchCount; $offset++) {
+            $activeQueries.Add([PSCustomObject]@{
+                ResultIndex = $start + $offset
+                PageToken = $null
+            })
+        }
+
+        $pageNumber = 0
+        while ($activeQueries.Count -gt 0) {
+            $pageNumber++
+            Write-Progress -Id 0 -Activity "OSV scan" -Status "Query batch $batchNumber of $totalBatches; page $pageNumber; $($activeQueries.Count) package queries" -PercentComplete ([Math]::Floor(($start / $Purls.Count) * 100))
+
+            $queries = @(
+                foreach ($activeQuery in $activeQueries) {
+                    $purl = $Purls[$activeQuery.ResultIndex].purl.replace(":cargo/", ":crates.io/")
+                    $query = @{
+                        package = @{
+                            purl = $purl
+                        }
+                    }
+                    if (-not [string]::IsNullOrEmpty($activeQuery.PageToken)) {
+                        $query.page_token = $activeQuery.PageToken
+                    }
+                    $query
+                }
+            )
+
+            $body = @{ queries = $queries } | ConvertTo-Json -Depth 5 -Compress
+            try {
+                $response = Invoke-WebRequest -Uri "https://api.osv.dev/v1/querybatch" -Method POST -Body $body -UseBasicParsing -ContentType 'application/json'
+            } catch {
+                throw "OSV batch query failed for components starting at index $($start + 1): $($_.Exception.Message)"
+            }
+
+            try {
+                $batchResponse = $response.Content | ConvertFrom-Json
+            } catch {
+                throw "OSV batch query returned invalid JSON for components starting at index $($start + 1): $($_.Exception.Message)"
+            }
+
+            $results = @($batchResponse.results)
+            if ($results.Count -ne $activeQueries.Count) {
+                throw "OSV batch query returned $($results.Count) results for $($activeQueries.Count) queries."
+            }
+
+            $nextActiveQueries = [System.Collections.Generic.List[object]]::new()
+            for ($resultIndex = 0; $resultIndex -lt $results.Count; $resultIndex++) {
+                $queryResult = $queryResults[$activeQueries[$resultIndex].ResultIndex]
+                foreach ($vulnerability in @($results[$resultIndex].vulns)) {
+                    if (($null -ne $vulnerability.id) -and ($vulnerability.id -notin $queryResult.VulnerabilityIds)) {
+                        $queryResult.VulnerabilityIds.Add($vulnerability.id) | Out-Null
+                    }
+                }
+
+                if (-not [string]::IsNullOrEmpty($results[$resultIndex].next_page_token)) {
+                    $nextActiveQueries.Add([PSCustomObject]@{
+                        ResultIndex = $activeQueries[$resultIndex].ResultIndex
+                        PageToken = $results[$resultIndex].next_page_token
+                    })
+                }
+            }
+            $activeQueries = $nextActiveQueries
+        }
+
+        Write-Progress -Id 0 -Activity "OSV scan" -Status "Package queries: $($start + $batchCount) of $($Purls.Count) complete" -PercentComplete ([Math]::Floor((($start + $batchCount) / $Purls.Count) * 100))
+    }
+
+    return $queryResults.ToArray()
+}
+
+function Get-OSVVulnerabilityDetail {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][string[]]$VulnerabilityIds
+    )
+
+    $vulnerabilitiesById = @{}
+    $uniqueIds = @($VulnerabilityIds | Select-Object -Unique)
+    $index = 0
+    foreach ($id in $uniqueIds) {
+        $index++
+        Write-Progress -Id 0 -Activity "OSV scan" -Status "Fetching vulnerability details: $index of $($uniqueIds.Count)" -PercentComplete ([Math]::Floor((($index - 1) / $uniqueIds.Count) * 100))
+
+        $escapedId = [System.Uri]::EscapeDataString($id)
+        try {
+            $response = Invoke-WebRequest -Uri "https://api.osv.dev/v1/vulns/$escapedId" -Method GET -UseBasicParsing
+        } catch {
+            throw "OSV vulnerability detail request failed for '$id': $($_.Exception.Message)"
+        }
+
+        try {
+            $vulnerabilitiesById[$id] = $response.Content | ConvertFrom-Json
+        } catch {
+            throw "OSV returned invalid vulnerability details for '$id': $($_.Exception.Message)"
+        }
+    }
+
+    if ($uniqueIds.Count -gt 0) {
+        Write-Progress -Id 0 -Activity "OSV scan" -Status "Fetched vulnerability details: $($uniqueIds.Count) of $($uniqueIds.Count)" -PercentComplete 100
+    } else {
+        Write-Progress -Id 0 -Activity "OSV scan" -Status "No vulnerability details to fetch" -PercentComplete 100
+    }
+
+    return $vulnerabilitiesById
+}
+
+function Get-CVEIdsForVulnerability {
+    [CmdletBinding()]
+    [OutputType([string[]])]
+    param(
+        [Parameter(Mandatory=$true)][PSObject]$Vulnerability
+    )
+
+    $cveIds = [System.Collections.Generic.List[string]]::new()
+    foreach ($candidate in @($Vulnerability.id) + @($Vulnerability.aliases)) {
+        if (($candidate -match '^CVE-\d{4}-\d{4,}$') -and ($candidate -notin $cveIds)) {
+            $cveIds.Add($candidate.ToUpperInvariant())
+        }
+    }
+
+    return $cveIds.ToArray()
+}
+
+function Get-CVEExploitationSignal {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][string[]]$CVEIds
+    )
+
+    $signalsByCVE = @{}
+    $uniqueCVEIds = @($CVEIds | Where-Object { $_ -match '^CVE-\d{4}-\d{4,}$' } | ForEach-Object { $_.ToUpperInvariant() } | Select-Object -Unique)
+    foreach ($cveId in $uniqueCVEIds) {
+        $signalsByCVE[$cveId] = [PSCustomObject]@{
+            CVE = $cveId
+            InCISAKEV = $null
+            KEVAddedDate = $null
+            KEVLookupStatus = 'Unavailable'
+            EPSS = $null
+            EPSSPercentile = $null
+            EPSSDate = $null
+            EPSSLookupStatus = 'Unavailable'
+        }
+    }
+
+    $nvdBatchSize = 100
+    $nvdBatchCount = [Math]::Ceiling($uniqueCVEIds.Count / $nvdBatchSize)
+    for ($start = 0; $start -lt $uniqueCVEIds.Count; $start += $nvdBatchSize) {
+        $batch = @($uniqueCVEIds | Select-Object -Skip $start -First $nvdBatchSize)
+        $batchNumber = [Math]::Floor($start / $nvdBatchSize) + 1
+        Write-Progress -Id 0 -Activity 'OSV scan' -Status "Checking CISA KEV via NVD: batch $batchNumber of $nvdBatchCount ($($batch.Count) CVEs)" -PercentComplete ([Math]::Floor(($start / $uniqueCVEIds.Count) * 100))
+
+        $uri = "https://services.nvd.nist.gov/rest/json/cves/2.0?cveIds=$($batch -join ',')"
+        try {
+            $response = Invoke-WebRequest -Uri $uri -Method GET -UseBasicParsing
+            $nvdResponse = $response.Content | ConvertFrom-Json
+            if ($null -eq $nvdResponse.PSObject.Properties['vulnerabilities']) {
+                throw 'NVD response did not contain a vulnerabilities collection.'
+            }
+
+            foreach ($entry in @($nvdResponse.vulnerabilities)) {
+                $cveId = $entry.cve.id.ToUpperInvariant()
+                if ($signalsByCVE.ContainsKey($cveId)) {
+                    $signalsByCVE[$cveId].KEVLookupStatus = 'Checked'
+                    if (-not [string]::IsNullOrEmpty($entry.cve.cisaExploitAdd)) {
+                        $signalsByCVE[$cveId].InCISAKEV = $true
+                        $signalsByCVE[$cveId].KEVAddedDate = $entry.cve.cisaExploitAdd
+                    } else {
+                        $signalsByCVE[$cveId].InCISAKEV = $false
+                    }
+                }
+            }
+
+            foreach ($cveId in $batch) {
+                if ($signalsByCVE[$cveId].KEVLookupStatus -eq 'Unavailable') {
+                    $signalsByCVE[$cveId].KEVLookupStatus = 'Checked'
+                    $signalsByCVE[$cveId].InCISAKEV = $false
+                }
+            }
+        } catch {
+            Write-Warning "CISA KEV lookup via NVD failed for CVEs in batch $batchNumber of ${nvdBatchCount}: $($_.Exception.Message)"
+        }
+
+        if ($start + $nvdBatchSize -lt $uniqueCVEIds.Count) {
+            Start-Sleep -Seconds 6
+        }
+    }
+
+    $epssBatches = [System.Collections.Generic.List[object]]::new()
+    $epssBatch = [System.Collections.Generic.List[string]]::new()
+    $epssBatchLength = 0
+    foreach ($cveId in $uniqueCVEIds) {
+        $addedLength = $cveId.Length
+        if ($epssBatch.Count -gt 0) {
+            $addedLength++
+        }
+        if (($epssBatch.Count -ge 100) -or ($epssBatchLength + $addedLength -gt 1900)) {
+            $epssBatches.Add($epssBatch.ToArray())
+            $epssBatch = [System.Collections.Generic.List[string]]::new()
+            $epssBatchLength = 0
+            $addedLength = $cveId.Length
+        }
+        $epssBatch.Add($cveId)
+        $epssBatchLength += $addedLength
+    }
+    if ($epssBatch.Count -gt 0) {
+        $epssBatches.Add($epssBatch.ToArray())
+    }
+
+    for ($batchIndex = 0; $batchIndex -lt $epssBatches.Count; $batchIndex++) {
+        $batch = $epssBatches[$batchIndex]
+        $batchNumber = $batchIndex + 1
+        Write-Progress -Id 0 -Activity 'OSV scan' -Status "Checking EPSS: batch $batchNumber of $($epssBatches.Count) ($($batch.Count) CVEs)" -PercentComplete ([Math]::Floor(($batchIndex / $epssBatches.Count) * 100))
+
+        $uri = "https://api.first.org/data/v1/epss?cve=$($batch -join ',')"
+        try {
+            $response = Invoke-WebRequest -Uri $uri -Method GET -UseBasicParsing
+            $epssResponse = $response.Content | ConvertFrom-Json
+            if ($null -eq $epssResponse.PSObject.Properties['data']) {
+                throw 'EPSS response did not contain a data collection.'
+            }
+
+            foreach ($entry in @($epssResponse.data)) {
+                $cveId = $entry.cve.ToUpperInvariant()
+                if ($signalsByCVE.ContainsKey($cveId)) {
+                    $signalsByCVE[$cveId].EPSS = [decimal]$entry.epss
+                    $signalsByCVE[$cveId].EPSSPercentile = [decimal]$entry.percentile
+                    $signalsByCVE[$cveId].EPSSDate = $entry.date
+                    $signalsByCVE[$cveId].EPSSLookupStatus = 'Scored'
+                }
+            }
+
+            foreach ($cveId in $batch) {
+                if ($signalsByCVE[$cveId].EPSSLookupStatus -eq 'Unavailable') {
+                    $signalsByCVE[$cveId].EPSSLookupStatus = 'NoScore'
+                }
+            }
+        } catch {
+            Write-Warning "EPSS lookup failed for CVEs in batch $batchNumber of $($epssBatches.Count): $($_.Exception.Message)"
+        }
+    }
+
+    if ($uniqueCVEIds.Count -gt 0) {
+        Write-Progress -Id 0 -Activity 'OSV scan' -Status "Checked exploitation signals for $($uniqueCVEIds.Count) CVEs" -PercentComplete 100
+    }
+
+    return $signalsByCVE
+}
+
+function Get-CVSSVectorMetric {
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory=$true)][string]$Vector
+    )
+
+    $metrics = @{}
+    foreach ($part in $Vector.Split('/')) {
+        if ($part -match '^([A-Z]{1,2}):(.+)$') {
+            $metrics[$Matches[1]] = $Matches[2]
+        }
+    }
+
+    $version = [regex]::Match($Vector, '^CVSS:(\d+\.\d+)/').Groups[1].Value
+    if ($version -eq '4.0') {
+        return [PSCustomObject]@{
+            CVSSVersion = $version
+            AV = $metrics['AV']
+            AC = $metrics['AC']
+            AT = $metrics['AT']
+            PR = $metrics['PR']
+            UI = $metrics['UI']
+            VC = $metrics['VC']
+            VI = $metrics['VI']
+            VA = $metrics['VA']
+            SC = $metrics['SC']
+            SI = $metrics['SI']
+            SA = $metrics['SA']
+        }
+    }
+
+    return [PSCustomObject]@{
+        CVSSVersion = $version
+        AV = $metrics['AV']
+        AC = $metrics['AC']
+        PR = $metrics['PR']
+        UI = $metrics['UI']
+        S = $metrics['S']
+        C = $metrics['C']
+        I = $metrics['I']
+        A = $metrics['A']
+    }
+}
+
+function Get-VulnerabilityExploitationAssessment {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyCollection()][string[]]$CVEIds,
+        [Parameter(Mandatory=$true)][hashtable]$SignalsByCVE,
+        [Parameter(Mandatory=$true)][decimal]$EPSSWarningThreshold
+    )
+
+    $cveSignals = @(
+        foreach ($cveId in $CVEIds) {
+            if ($SignalsByCVE.ContainsKey($cveId)) {
+                $SignalsByCVE[$cveId]
+            }
+        }
+    )
+    $kevSignal = @($cveSignals | Where-Object { $_.InCISAKEV -eq $true } | Select-Object -First 1)
+    $scoredSignals = @($cveSignals | Where-Object { $null -ne $_.EPSS } | Sort-Object -Property EPSS -Descending)
+    $maxEPSSSignal = $scoredSignals | Select-Object -First 1
+    $hasAvailableSignal = @($cveSignals | Where-Object { $_.KEVLookupStatus -eq 'Checked' -or $_.EPSSLookupStatus -eq 'Scored' -or $_.EPSSLookupStatus -eq 'NoScore' }).Count -gt 0
+    $kevCheckedCount = @($cveSignals | Where-Object { $_.KEVLookupStatus -eq 'Checked' }).Count
+    $kevChecked = ($cveSignals.Count -gt 0) -and ($kevCheckedCount -eq $cveSignals.Count)
+    $epssCheckedCount = @($cveSignals | Where-Object { $_.EPSSLookupStatus -in @('Scored', 'NoScore') }).Count
+    $epssUnavailableCount = @($cveSignals | Where-Object { $_.EPSSLookupStatus -eq 'Unavailable' }).Count
+    $reasons = [System.Collections.Generic.List[string]]::new()
+
+    if ($kevSignal.Count -gt 0) {
+        $reasons.Add('CISA KEV')
+    }
+    if (($null -ne $maxEPSSSignal) -and ($maxEPSSSignal.EPSS -ge $EPSSWarningThreshold)) {
+        $epssComparison = if ($maxEPSSSignal.EPSS -eq $EPSSWarningThreshold) { 'meets' } else { 'exceeds' }
+        $reasons.Add("EPSS $($maxEPSSSignal.EPSS.ToString('0.####')) $epssComparison threshold of $($EPSSWarningThreshold.ToString('0.####'))")
+    }
+
+    if ($reasons.Count -gt 0) {
+        $priority = 'ELEVATED'
+    } elseif ($hasAvailableSignal) {
+        $priority = 'STANDARD'
+    } elseif ($CVEIds.Count -eq 0) {
+        $priority = 'NOT APPLICABLE'
+    } else {
+        $priority = 'UNAVAILABLE'
+    }
+
+    return [PSCustomObject]@{
+        CVEIds = @($CVEIds)
+        CVEExploitationSignals = $cveSignals
+        InCISAKEV = if ($kevSignal.Count -gt 0) { $true } elseif ($kevChecked) { $false } else { $null }
+        KEVAddedDate = if ($kevSignal.Count -gt 0) { $kevSignal[0].KEVAddedDate } else { $null }
+        KEVLookupStatus = if ($kevChecked) { 'Checked' } elseif ($kevCheckedCount -gt 0) { 'Partial' } else { 'Unavailable' }
+        EPSS = if ($null -ne $maxEPSSSignal) { $maxEPSSSignal.EPSS } else { $null }
+        EPSSPercentile = if ($null -ne $maxEPSSSignal) { $maxEPSSSignal.EPSSPercentile } else { $null }
+        EPSSDate = if ($null -ne $maxEPSSSignal) { $maxEPSSSignal.EPSSDate } else { $null }
+        EPSSLookupStatus = if (($epssUnavailableCount -gt 0) -and ($epssCheckedCount -gt 0)) { 'Partial' } elseif ($epssUnavailableCount -gt 0) { 'Unavailable' } elseif ($scoredSignals.Count -gt 0) { 'Scored' } else { 'NoScore' }
+        EPSSWarningThreshold = $EPSSWarningThreshold
+        ExploitationPriority = $priority
+        ExploitationReasons = $reasons.ToArray()
+    }
+}
+
 function Get-VulnList {
     [CmdletBinding()]
     param(
@@ -905,12 +1396,30 @@ function Get-VulnList {
         [Parameter(Mandatory=$true)][string]$outfile,
         [Parameter(Mandatory=$true)][boolean]$ListAll,
         [Parameter(Mandatory=$true)][decimal]$minScore,
+        [Parameter(Mandatory=$true)][decimal]$EPSSWarningThreshold,
         [Parameter(Mandatory=$true)][ref]$componentLocations,
         [Parameter(Mandatory=$true)][ref]$vulnLocations
     )
     # this function reads through a list of purls and queries the OSV DB using the purl of each component to find all vulnerabilities per component.
     # for each vulnerability, it will collect the summary, deatils, vuln id, fixed version, link to CVSS score calculator, and license info
     # at the end of the component, as well as the recommended upgrade version if all vulnerabilities have been addressed in upgrades
+
+    $batchResults = @(Get-OSVQueryResult -Purls $purls)
+    $vulnerabilityIds = @(
+        foreach ($queryResult in $batchResults) {
+            foreach ($id in $queryResult.VulnerabilityIds) {
+                $id
+            }
+        }
+    )
+    $vulnerabilityDetails = Get-OSVVulnerabilityDetail -VulnerabilityIds $vulnerabilityIds
+    $allCVEIds = @(
+        foreach ($vulnerability in $vulnerabilityDetails.Values) {
+            Get-CVEIdsForVulnerability -Vulnerability $vulnerability
+        }
+    )
+    $allCVEIds = @($allCVEIds | Select-Object -Unique)
+    $exploitationSignals = Get-CVEExploitationSignal -CVEIds $allCVEIds
 
     $index = 0
     $validVuln = 0
@@ -919,32 +1428,13 @@ function Get-VulnList {
 
         $index++
         if ($null -ne $purls.count) {
-        Write-Progress -Activity "Querying OSV for all purls" -Status "$index of $($purls.count) processed" -PercentComplete (($index / $purls.count) * 100)
+        Write-Progress -Id 0 -Activity "OSV scan" -Status "Processing components: $index of $($purls.count)" -PercentComplete (($index / $purls.count) * 100)
         } else {
-            Write-Progress -Activity "Querying OSV for all purls" -Status "$index of 1 processed" -PercentComplete (100)
+            Write-Progress -Id 0 -Activity "OSV scan" -Status "Processing components: $index of 1" -PercentComplete 100
         }
 
-        # Build the JSON body for the OSV API query
-        # noticed that OSV.dev records cargo package type as crates.io, need to handle that here on query
-        try {
-                $body = @{
-                    "package" = @{
-                        "purl" = $purl.purl.replace(":cargo/",":crates.io/")
-                    }
-                } | ConvertTo-Json
-            } catch {
-                write-output "Error constructing OSV.dev query body from purl $($purl) at index $($index): $($_.Exception.Message)"
-            }
-
-        # Invoke the OSV API with the JSON body and save the response
-        try {
-            $response = Invoke-WebRequest -uri "https://api.osv.dev/v1/query" -Method POST -Body $body -UseBasicParsing -ContentType 'application/json'
-        } catch {
-            Write-Output "OSV search for $($purl.purl) returned an error: $($_.Exception.Message)"
-        }
-
-        # Check if the response has any vulnerabilities
-        if ($response.Content.length -gt 2) {
+        $queryResult = $batchResults[$index - 1]
+        if ($queryResult.VulnerabilityIds.Count -gt 0) {
             $name = Get-NameFromPurl($purl.purl)
             $version = Get-VersionFromPurl($purl.purl)
 
@@ -957,10 +1447,12 @@ function Get-VulnList {
                 Vulns = [System.Collections.ArrayList]@()
             }
 
-            $vulns = $response.Content | ConvertFrom-Json
+            $vulns = foreach ($id in $queryResult.VulnerabilityIds) {
+                $vulnerabilityDetails[$id]
+            }
 
             # Loop through each vulnerability in the response
-            foreach ($vulnerability in $vulns.vulns) {
+            foreach ($vulnerability in $vulns) {
 
                 # build new object to store all properties
                 $vuln = [PSCustomObject]@{
@@ -970,29 +1462,27 @@ function Get-VulnList {
                     Source = "OSV"
                     Fixed = ""
                     Score = ""
-                    AV = ""
-                    AC = ""
-                    PR = ""
-                    UI = ""
-                    S = ""
-                    C = ""
-                    I = ""
-                    A = ""
+                    CVSSVersion = ""
                     ScoreURI = ""
                     Severity = ""
                 }
 
+                $cveIds = @(Get-CVEIdsForVulnerability -Vulnerability $vulnerability)
+                $exploitationAssessment = Get-VulnerabilityExploitationAssessment -CVEIds $cveIds -SignalsByCVE $exploitationSignals -EPSSWarningThreshold $EPSSWarningThreshold
+                $vuln | Add-Member -MemberType NoteProperty -Name CVEIds -Value $cveIds
+                $vuln | Add-Member -MemberType NoteProperty -Name ExploitationPriority -Value $exploitationAssessment.ExploitationPriority
+                $vuln | Add-Member -MemberType NoteProperty -Name ExploitationReasons -Value $exploitationAssessment.ExploitationReasons
+
                 #build uri string to display calculated score and impacted areas
                 if ($vulnerability | Get-Member "Severity") {
-                    $vuln.Score = $vulnerability.severity[0].score
-                    $vuln.AV = $vulnerability.severity[0].score.split("/")[1].split(":")[1]
-                    $vuln.AC = $vulnerability.severity[0].score.split("/")[2].split(":")[1]
-                    $vuln.PR = $vulnerability.severity[0].score.split("/")[3].split(":")[1]
-                    $vuln.UI = $vulnerability.severity[0].score.split("/")[4].split(":")[1]
-                    $vuln.S = $vulnerability.severity[0].score.split("/")[5].split(":")[1]
-                    $vuln.C = $vulnerability.severity[0].score.split("/")[6].split(":")[1]
-                    $vuln.I = $vulnerability.severity[0].score.split("/")[7].split(":")[1]
-                    $vuln.A = $vulnerability.severity[0].score.split("/")[8].split(":")[1]
+                    $CVSSSevScore = $vulnerability.severity[0].score
+                    $cvssMetrics = Get-CVSSVectorMetric -Vector $CVSSSevScore
+                    $vuln.CVSSVersion = $cvssMetrics.CVSSVersion
+                    foreach ($metric in $cvssMetrics.PSObject.Properties) {
+                        if ($metric.Name -ne 'CVSSVersion') {
+                            $vuln | Add-Member -MemberType NoteProperty -Name $metric.Name -Value $metric.Value
+                        }
+                    }
 
                      $CVSSCount = $vulnerability.severity.score.count
                         if ($CVSSCount -gt 1) {
@@ -1115,6 +1605,7 @@ function Get-VulnList {
                         }
                     }
                 }
+
             }
         } else {
             if ($ListAll) {
@@ -1122,6 +1613,8 @@ function Get-VulnList {
             }
         }
     }
+
+    Write-Progress -Id 0 -Activity "OSV scan" -Completed
 }
 
 function Get-SBOMType {
@@ -1151,45 +1644,55 @@ function Get-CycloneDXComponentList {
     )
 
     $purlList = [System.Collections.Generic.List[PSOBJECT]]::new()
+    $packages = @($SBOM.components)
+    $packageIndex = 0
 
-    foreach ($package in $SBOM.components) {
+    foreach ($package in $packages) {
+        $packageIndex++
+        $percentComplete = if ($packages.Count -gt 0) { [Math]::Floor(($packageIndex / $packages.Count) * 100) } else { 100 }
+        Write-Progress -Id 1 -ParentId 0 -Activity "Extracting CycloneDX components" -Status "$file`: component $packageIndex of $($packages.Count)" -PercentComplete $percentComplete
+
         $type = $package.type
-        $pkgLicenses = $package.licenses
+        $packageLicenseIds = [System.Collections.Generic.List[string]]::new()
 
-        $found = $false
-        #Pull out all the unique licenses found in the SBOM as you go. The full list will be printed together in the report.
-        foreach ($license in $pkgLicenses) {
-            foreach ($complicense in $allLicenses) {
-                if ($complicense -eq $license.license.id) {
-                    $found = $true
-                }
+        foreach ($licenseChoice in @($package.licenses)) {
+            $licenseId = if (-not [string]::IsNullOrWhiteSpace($licenseChoice.expression)) {
+                $licenseChoice.expression
+            } elseif (-not [string]::IsNullOrWhiteSpace($licenseChoice.license.id)) {
+                $licenseChoice.license.id
+            } elseif (-not [string]::IsNullOrWhiteSpace($licenseChoice.license.name)) {
+                $licenseChoice.license.name
+            } else {
+                $null
             }
-            if (!($found)) {
-                if ($null -ne $license.license.id) {
-                    $allLicenses += $license.license.id
-                }
+
+            if (($null -ne $licenseId) -and ($licenseId -notin $packageLicenseIds)) {
+                $packageLicenseIds.Add($licenseId)
+            }
+            if (($null -ne $licenseId) -and ($licenseId -notin $allLicenses)) {
+                $allLicenses.Add($licenseId) | Out-Null
             }
         }
 
         if ($type -eq "library" -or $type -eq "framework") {
             # Get the component purl
-            if ($package.purl -notin $allpurls) {
-                if ($null -ne $license.license.id) {
-                    $packageInfo = [PSCustomObject]@{
-                        "purl" = $package.purl
-                        "license" = $license.license.id
-                    }
-                } else {
-                    $packageInfo = [PSCustomObject]@{
-                        "purl" = $package.purl
-                        "license" = "NOASSERTION"
-                    }
+            $purlString = [string]$package.purl
+            $purlInfo = Get-PurlInfo -Purl $purlString
+            if (-not $purlInfo.IsValid) {
+                Write-Warning "Skipping invalid PURL '$purlString' in SBOM '$file': $($purlInfo.Reason)"
+                continue
+            }
+            if ($purlString -notin $allpurls) {
+                $componentLicense = if ($packageLicenseIds.Count -gt 0) { $packageLicenseIds -join '; ' } else { "NOASSERTION" }
+                $packageInfo = [PSCustomObject]@{
+                    "purl" = $purlString
+                    "license" = $componentLicense
                 }
 
                 $purlList.Add($packageInfo)
                 $loc = [PSCustomObject]@{
-                    "component" = Get-NameFromPurl -purl $package.purl;
-                    "version" = Get-VersionFromPurl -purl $package.purl;
+                    "component" = $purlInfo.Name;
+                    "version" = if ([string]::IsNullOrEmpty($purlInfo.Version)) { [string]$package.version } else { $purlInfo.Version };
                     "file" = $file
                   }
                 $componentLocations.value.Add($loc) | Out-Null
@@ -1212,6 +1715,8 @@ function Get-CycloneDXComponentList {
         }
     }
 
+    Write-Progress -Id 1 -ParentId 0 -Activity "Extracting CycloneDX components" -Completed
+
     if ($PrintLicenseInfo) {
         Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
         Write-Output "-   SBOM File:  $file" | Out-File -FilePath $outfile -Append
@@ -1232,8 +1737,14 @@ function Get-SPDXComponentList {
     )
 
     $purlList = [System.Collections.Generic.List[PSOBJECT]]::new()
+    $packages = @($SBOM.packages)
+    $packageIndex = 0
 
-    foreach ($package in $SBOM.packages) {
+    foreach ($package in $packages) {
+        $packageIndex++
+        $percentComplete = if ($packages.Count -gt 0) { [Math]::Floor(($packageIndex / $packages.Count) * 100) } else { 100 }
+        Write-Progress -Id 1 -ParentId 0 -Activity "Extracting SPDX components" -Status "$file`: package $packageIndex of $($packages.Count)" -PercentComplete $percentComplete
+
         $decLicense = $package.licenseDeclared
         $conLicense = $package.licenseConcluded
         if (($decLicense -ne "") -and ($null -ne $decLicense)) {
@@ -1244,70 +1755,29 @@ function Get-SPDXComponentList {
             $useLicense = "NOASSERTION"
         }
 
-        if (($package.externalRefs.referenceLocator -ne "") -and ($null -ne $package.externalRefs.referenceLocator)) {
-            $testVersion = Get-VersionFromPurl -purl $package.externalRefs.referenceLocator
-            if ($testVersion -eq "") {
-                #$testVersion = ($package.versioninfo).trimstart('^', '>', '<', '=', ' ')
-                $rangePattern = '(?<=\>|\>=)\d+(\.\d+){0,2}'
-
-                $testVersion = [regex]::Match(($package.versionInfo -replace " ",""), $rangePattern).Value
+        if (($useLicense -ne "NOASSERTION") -and ($null -ne $useLicense) -and ($useLicense -notin $allLicenses)) {
+            $allLicenses.Add($useLicense) | Out-Null
         }
 
-            if ($testVersion -ne "") {
-                $components = $testVersion.Split('.')
-
-                while ($components.count -lt 3) {
-                    $testversion += ".0"
-                    $components = $testVersion.Split('.')
-                }
-            }
-
-            $testName = Get-NameFromPurl -purl $package.externalRefs.referenceLocator
-            if ($testName -eq "") {
-                #encountered some differences in the SPDX purl formats, need to handle those here
-                $testName = $package.externalRefs.referenceLocator
-                $purlString = $testName + "@" + $testVersion
-            } else {
-                if (Test-PurlFormat($package.externalRefs.referenceLocator)) {
-                    $purlString = ($package.externalRefs.referenceLocator) #.split("@")[0]
-                }
-            }
-        } else {
-            $testName = ""
-            $testVersion = ""
-        }
-
-        $found = $false
-        #Pull out all the unique licenses found in the SBOM as you go. The full list will be printed together in the report.
-        foreach ($complicense in $allLicenses) {
-            if (($complicense -eq $useLicense) -and ($useLicense -ne "NOASSERTION") -and ($null -ne $useLicense)) {
-                $found = $true
-            }
-        }
-
-        if (!($found) -and ($null -ne $useLicense)) {
-            $allLicenses += $useLicense
-            $found = $true
-        } else {
-            $found = $false
-        }
-
-        foreach ($refType in $package.externalRefs) {
+        foreach ($refType in @($package.externalRefs)) {
             if ($refType.referenceType -eq "purl") {
-                # Get the component purl
-                if ($refType.referenceLocator -notin $allpurls) {
-                    #$purlList += $refType.referenceLocator
-                    if ($found) {
-                        $packageInfo = [PSCustomObject]@{
-                            "purl" = $purlString
-                            "license" = $useLicense
-                        }
-                } else {
+                $referenceLocator = [string]$refType.referenceLocator
+                $purlInfo = Get-PurlInfo -Purl $referenceLocator
+                if (-not $purlInfo.IsValid) {
+                    Write-Warning "Skipping invalid PURL '$referenceLocator' in SBOM '$file': $($purlInfo.Reason)"
+                    continue
+                }
+
+                if ($referenceLocator -notin $allpurls) {
+                    $testVersion = $purlInfo.Version
+                    if ([string]::IsNullOrEmpty($testVersion)) {
+                        $testVersion = [string]$package.versionInfo
+                    }
+                    $testName = $purlInfo.Name
                     $packageInfo = [PSCustomObject]@{
-                        "purl" = $purlString
+                        "purl" = $referenceLocator
                         "license" = $useLicense
                     }
-                }
                     $purlList.Add($packageInfo)
 
                     $loc = [PSCustomObject]@{
@@ -1320,6 +1790,8 @@ function Get-SPDXComponentList {
             }
         }
     }
+
+    Write-Progress -Id 1 -ParentId 0 -Activity "Extracting SPDX components" -Completed
 
     if ($PrintLicenseInfo) {
         Write-Output "------------------------------------------------------------" | Out-File -FilePath $outfile -Append
@@ -1338,6 +1810,7 @@ function SBOMResearcher {
         [Parameter(Mandatory=$true)][string]$SBOMPath, #Path to a directory of SBOMs, or path to a single SBOM
         [Parameter(Mandatory=$true)][string]$wrkDir, #Directory where reports will be written, do NOT make it the same as $SBOMPath
         [Parameter(Mandatory=$true)][decimal]$minScore, #minimum score to include in report and output
+        [Parameter(Mandatory=$false)][ValidateRange(0.0, 1.0)][decimal]$EPSSWarningThreshold=0.3, #EPSS probability that adds an elevated-priority signal without changing minScore filtering
         [Parameter(Mandatory=$false)][boolean]$ListAll=$false, #flag to write all components found in report, even if no vulnerabilities found
         [Parameter(Mandatory=$false)][boolean]$PrintLicenseInfo=$false #flag to print license info in report
     )
@@ -1349,7 +1822,7 @@ function SBOMResearcher {
         mkdir $wrkDir
     }
 
-    $allLicenses = @()
+    $allLicenses = [System.Collections.ArrayList]::new()
     $allpurls = @()
     $allVulns=[System.Collections.ArrayList]@()
     $componentLocations=[System.Collections.ArrayList]@()
@@ -1366,9 +1839,14 @@ function SBOMResearcher {
         #call Get-Vulns with each file in the directory
         #if files other than sboms are in the directory, this could cause errors
         #that's why it's best not to have the output dir the same as the sbom dir
-        foreach ($file in $argtype.GetFiles()) {
+        $sbomFiles = @($argType.GetFiles())
+        $fileIndex = 0
+        foreach ($file in $sbomFiles) {
+            $fileIndex++
             if ($file.extension -eq ".json") {
+            Write-Progress -Id 0 -Activity "Reading SBOMs" -Status "Loading SBOM $fileIndex of $($sbomFiles.Count): $($file.Name)" -PercentComplete ([Math]::Floor(($fileIndex / $sbomFiles.Count) * 100))
             $SBOM = Get-Content -Path $file.fullname | ConvertFrom-Json
+            Write-Progress -Id 0 -Activity "Reading SBOMs" -Status "Extracting components from SBOM $fileIndex of $($sbomFiles.Count): $($file.Name)" -PercentComplete ([Math]::Floor(($fileIndex / $sbomFiles.Count) * 100))
             $SBOMType = Get-SBOMType -SBOM $SBOM
             switch ($SBOMType) {
                     "CycloneDX" { $allpurls += Get-CycloneDXComponentList -SBOM $SBOM -allLicenses $allLicenses -componentLocations ([ref]$componentLocations) }
@@ -1378,8 +1856,11 @@ function SBOMResearcher {
         }
         }
 
+            Write-Progress -Id 1 -Activity "Extracting SBOM components" -Completed
+            Write-Progress -Id 0 -Activity "Reading SBOMs" -Completed
+
             if ($null -ne $allpurls) {
-            Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -minScore $minScore -componentLocations ([ref]$componentLocations) -vulnLocations ([ref]$vulnLocations)
+            Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -minScore $minScore -EPSSWarningThreshold $EPSSWarningThreshold -componentLocations ([ref]$componentLocations) -vulnLocations ([ref]$vulnLocations)
             }
 
             $allVulns | ConvertTo-Json -Depth 5 | Out-Null
@@ -1394,7 +1875,9 @@ function SBOMResearcher {
             Write-Output "=====================================================================================" | Out-File -FilePath $outfile -Append
             Write-Output "" | Out-File -FilePath $outfile -Append
 
+            Write-Progress -Id 0 -Activity "Reading SBOMs" -Status "Loading SBOM: $($argType.Name)" -PercentComplete 0
             $SBOM = Get-Content -Path $SBOMPath | ConvertFrom-Json
+            Write-Progress -Id 0 -Activity "Reading SBOMs" -Status "Extracting components from SBOM: $($argType.Name)" -PercentComplete 50
             $SBOMType = Get-SBOMType -SBOM $SBOM
             $allpurls = @()
             switch ($SBOMType) {
@@ -1402,8 +1885,10 @@ function SBOMResearcher {
             "SPDX" { $allpurls = Get-SPDXComponentList -SBOM $SBOM -allLicenses $allLicenses -componentLocations ([ref]$componentLocations) }
                 "Unsupported" { Write-Output "This SBOM type is not supported" | Out-File -FilePath $outfile -Append }
             }
-            if ($null -ne $allpurls) {
-            Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -minScore $minScore -componentLocations ([ref]$componentLocations) -vulnLocations ([ref]$vulnLocations)
+                Write-Progress -Id 1 -Activity "Extracting SBOM components" -Completed
+                Write-Progress -Id 0 -Activity "Reading SBOMs" -Completed
+                if ($null -ne $allpurls) {
+            Get-VulnList -purls $allpurls -outfile $outfile -ListAll $ListAll -minScore $minScore -EPSSWarningThreshold $EPSSWarningThreshold -componentLocations ([ref]$componentLocations) -vulnLocations ([ref]$vulnLocations)
             }
             $allVulns | ConvertTo-Json -Depth 5 | Out-Null
 
@@ -1413,4 +1898,4 @@ function SBOMResearcher {
     }
 }
 
-#SBOMResearcher -SBOMPath "C:\Temp\sbom_test\" -ProjectName "Testing" -wrkDir "C:\Temp\sbom_test\reports" -PrintLicenseInfo $true -minScore 7.0
+#SBOMResearcher -SBOMPath "C:\Temp\sbom_test\" -ProjectName "Testing" -wrkDir "C:\Temp\sbom_test\reports" -EPSSWarningThreshold 0.3 -PrintLicenseInfo $true -minScore 7.0
